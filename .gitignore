@@ -1,3 +1,11 @@
+/.idea
+/build
+/test
+nob
+nob.old
+#CLion is dumb
+CMakeLists.txt
+
 # Prerequisites
 *.d
 
