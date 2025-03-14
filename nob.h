@@ -530,7 +530,7 @@ Nob_String_View nob_sv_from_parts(const char *data, size_t count);
 // nob_sb_to_sv() enables you to just view Nob_String_Builder as Nob_String_View
 #define nob_sb_to_sv(sb) nob_sv_from_parts((sb).items, (sb).count)
 
-// printf macros for String_View
+// printf macros for StringView
 #ifndef SV_Fmt
 #define SV_Fmt "%.*s"
 #endif // SV_Fmt
@@ -538,7 +538,7 @@ Nob_String_View nob_sv_from_parts(const char *data, size_t count);
 #define SV_Arg(sv) (int) (sv).count, (sv).data
 #endif // SV_Arg
 // USAGE:
-//   String_View name = ...;
+//   StringView name = ...;
 //   printf("Name: "SV_Fmt"\n", SV_Arg(name));
 
 
