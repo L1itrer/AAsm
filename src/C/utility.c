@@ -1,15 +1,31 @@
 #include "utility.h"
 
-//bool string_read_file(const char* path, String* str)
-//{
-//    int file = open(path, O_RDONLY);
-//    if (file == -1)
-//    {
-//        const char msg[] = "[ERROR]: Could not open file";
-//        write(stderr, msg, sizeof(msg) - 1);
-//    }
-//
-//}
+bool string_read_file(const char* path, String* str)
+{
+    FILE* file = fopen(path, "rb");
+    if (file == NULL) goto failure;
+    if (fseek(file, 0, SEEK_END) == -1) goto failure;
+    long file_size = ftell(file);
+    if (file_size < 0) goto failure;
+    if (fseek(file, 0, SEEK_SET) < 0) goto failure;
+
+    u64 new_count = str->count + file_size;
+    if (new_count > str->capacity)
+    {
+        str->capacity = new_count;
+        str->data = oasm_realloc(str->data, str->capacity);
+    }
+    fclose(file);
+    fread(str->data + str->count, file_size, 1, file);
+    if (ferror(file)) goto failure;
+    str->count = new_count;
+    return true;
+
+failure:
+    oasm_log(LOG_ERROR, "Could not read file %s: %s", path, strerror(errno));
+    fclose(file);
+    return false;
+}
 
 
 // memory related functions:
@@ -76,8 +92,6 @@ static bool is_literal_character_valid(unsigned char c, i32 base)
     else if (c >= 'a' && c <= 'f') result += c - 87; \
     else result += c - '0';                       \
     } while(0)
-
-
 
 
 i32 sv_to_i32(SV slice, Bases base)

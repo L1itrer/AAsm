@@ -27,6 +27,8 @@ typedef uint32_t u32;
 typedef int64_t i64;
 typedef uint64_t u64;
 
+#define DA_INIT_CAP 1024*8
+
 typedef struct String
 {
     byte* data;
@@ -47,9 +49,22 @@ bool string_read_file(const char* path, String* str);
 
 //TODO: To rewrite this thing in itself I need my own implementations of libc functions
 // memory related functions:
+
 void* oasm_memset(void* buffer, i32 value, u64 count);
 void* oasm_memcpy(void* dst, void* src, u64 count);
 void* oasm_malloc(u64 count);
+void* oasm_realloc(void* buffer, u64 count);
+#define oasm_append(da, item)                                                          \
+    do {                                                                                 \
+        if ((da)->count >= (da)->capacity) {                                             \
+            (da)->capacity = (da)->capacity == 0 ? DA_INIT_CAP : (da)->capacity*2;   \
+            (da)->items = NOB_REALLOC((da)->items, (da)->capacity*sizeof(*(da)->items)); \
+            NOB_ASSERT((da)->items != NULL && "Buy more RAM lol");                       \
+        }                                                                                \
+                                                                                         \
+        (da)->items[(da)->count++] = (item);                                             \
+    } while (0)
+
 
 // standard output
 
