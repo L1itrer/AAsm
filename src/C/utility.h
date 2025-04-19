@@ -11,12 +11,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <assert.h>
 
 #ifndef stdout
 #define stdout 1
 #define stderr 2
 #endif //stdout
 
+#define UNREACHABLE(msg) do { fprintf(stderr, "%s:%d UNREACHABLE: %s at", __FILE__, __LINE__, msg); abort(); } while(0)
 typedef unsigned char byte;
 typedef int8_t i8;
 typedef uint8_t u8;
@@ -50,16 +52,16 @@ bool string_read_file(const char* path, String* str);
 //TODO: To rewrite this thing in itself I need my own implementations of libc functions
 // memory related functions:
 
-void* oasm_memset(void* buffer, i32 value, u64 count);
-void* oasm_memcpy(void* dst, void* src, u64 count);
-void* oasm_malloc(u64 count);
-void* oasm_realloc(void* buffer, u64 count);
-#define oasm_append(da, item)                                                          \
+void* aasm_memset(void* buffer, i32 value, u64 count);
+void* aasm_memcpy(void* dst, void* src, u64 count);
+void* aasm_malloc(u64 count);
+void* aasm_realloc(void* buffer, u64 count);
+#define aasm_append(da, item)                                                          \
     do {                                                                                 \
         if ((da)->count >= (da)->capacity) {                                             \
             (da)->capacity = (da)->capacity == 0 ? DA_INIT_CAP : (da)->capacity*2;   \
-            (da)->items = NOB_REALLOC((da)->items, (da)->capacity*sizeof(*(da)->items)); \
-            NOB_ASSERT((da)->items != NULL && "Buy more RAM lol");                       \
+            (da)->items = aasm_realloc((da)->items, (da)->capacity*sizeof(*(da)->items)); \
+            assert((da)->items != NULL && "Buy more RAM lol");                       \
         }                                                                                \
                                                                                          \
         (da)->items[(da)->count++] = (item);                                             \
@@ -68,14 +70,14 @@ void* oasm_realloc(void* buffer, u64 count);
 
 // standard output
 
-typedef enum OasmLogLevel
+typedef enum AasmLogLevel
 {
     LOG_INFO,
     LOG_WARNING,
     LOG_ERROR
-}OasmLogLevel;
+}AasmLogLevel;
 
-void oasm_log(OasmLogLevel level, const char* format, ...);
+void aasm_log(AasmLogLevel level, const char* format, ...);
 
 // number conversion
 

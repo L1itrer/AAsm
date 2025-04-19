@@ -13,16 +13,16 @@ bool string_read_file(const char* path, String* str)
     if (new_count > str->capacity)
     {
         str->capacity = new_count;
-        str->data = oasm_realloc(str->data, str->capacity);
+        str->data = aasm_realloc(str->data, str->capacity);
     }
-    fclose(file);
     fread(str->data + str->count, file_size, 1, file);
     if (ferror(file)) goto failure;
     str->count = new_count;
+    fclose(file);
     return true;
 
 failure:
-    oasm_log(LOG_ERROR, "Could not read file %s: %s", path, strerror(errno));
+    aasm_log(LOG_ERROR, "Could not read file %s: %s", path, strerror(errno));
     fclose(file);
     return false;
 }
@@ -30,29 +30,29 @@ failure:
 
 // memory related functions:
 
-void* oasm_memset(void* buffer, i32 value, u64 count)
+void* aasm_memset(void* buffer, i32 value, u64 count)
 {
     return memset(buffer, value, count);
 }
 
-void* oasm_memcpy(void* dst, void* src, u64 count)
+void* aasm_memcpy(void* dst, void* src, u64 count)
 {
     return memcpy(dst, src, count);
 }
 
-void* oasm_malloc(u64 count)
+void* aasm_malloc(u64 count)
 {
     return malloc(count);
 }
 
-void* oasm_realloc(void* buffer, u64 count)
+void* aasm_realloc(void* buffer, u64 count)
 {
     return realloc(buffer, count);
 }
 
 // standard output
 
-void oasm_log(OasmLogLevel level, const char* format, ...)
+void aasm_log(AasmLogLevel level, const char* format, ...)
 {
     switch(level)
     {
@@ -94,6 +94,7 @@ static bool is_literal_character_valid(unsigned char c, i32 base)
     } while(0)
 
 
+
 i32 sv_to_i32(SV slice, Bases base)
 {
     i32 result = 0;
@@ -111,10 +112,11 @@ i32 sv_to_i32(SV slice, Bases base)
 
     for (u64 i = 0; i < slice.length;i += 1)
     {
-        u8 c = slice.pointer[i];
+        u8 c = slice.pointer[i];\
+        if (c == '_') continue;
         if (!is_literal_character_valid(c, multiply_by))
         {
-            oasm_log(LOG_ERROR, "Invalid number literal conversion");
+            aasm_log(LOG_ERROR, "Invalid number literal conversion");
             result = 0;
             break;
         }
@@ -122,3 +124,16 @@ i32 sv_to_i32(SV slice, Bases base)
     }
     return result;
 }
+
+i64 sv_cmp(SV str1, SV str2)
+{
+    if (str1.length != str2.length) return (i64)(str1.length - str2.length);
+    for (u64 i = 0;i < str1.length;++i)
+    {
+        if (str1.pointer[i] != str2.pointer[i])
+            return str1.pointer[i] - str2.pointer[i];
+    }
+    return 0;
+}
+#define SV_CMP_CSTR(sv, cstr) sv_cmp(sv, (SV){.pointer = cstr, .length = strlen(cstr)});
+

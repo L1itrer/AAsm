@@ -28,8 +28,28 @@ typedef struct Token {
 typedef struct Tokens{
     Token* items;
     size_t count;
-    size_t capacity
+    size_t capacity;
 }Tokens;
+
+typedef enum Registers{
+    AX,
+    BX,
+    CX,
+    DX,
+    BP,
+    SI,
+    DI,
+    SP,
+    R8,
+    R9,
+    R10,
+    R11,
+    R12,
+    R13,
+    R14,
+    R15,
+}Registers;
+
 
 bool parse_file(String* file, Tokens* tokens);
 
