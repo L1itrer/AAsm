@@ -2,6 +2,9 @@
 /build
 nob
 nob.old
+/temp
+*.bin
+*.txt
 #CLion is dumb
 CMakeLists.txt
 
