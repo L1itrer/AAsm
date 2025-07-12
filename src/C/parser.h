@@ -3,6 +3,7 @@
 #include "utility.h"
 
 typedef enum TokenKind {
+    TOK_INVALID= 0,
     INSTRUCTION,
     COMMA,
     SEMI_COLON,
@@ -50,6 +51,12 @@ typedef enum Registers{
     R15,
 }Registers;
 
+typedef enum Instruction {
+    INSTR_INVALID,
+    MOV,
+    SYSCALL,
+    RET,
+}Instruction;
 
 bool parse_file(String* file, Tokens* tokens);
 

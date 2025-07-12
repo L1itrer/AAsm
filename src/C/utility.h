@@ -33,14 +33,14 @@ typedef uint64_t u64;
 
 typedef struct String
 {
-    byte* data;
+    char* data;
     u64 count;
     u64 capacity;
 } String;
 
 typedef struct StringView
 {
-    byte* pointer;
+    char* pointer;
     u64 length;
 } StringView;
 
@@ -82,16 +82,20 @@ void aasm_log(AasmLogLevel level, const char* format, ...);
 // number conversion
 
 typedef enum Bases{
+    INVALID,
     BIN = 2,
     OCT = 8,
     DEC = 10,
-    HEX = 16
+    HEX = 16,
 }Bases;
 
 i32 sv_to_i32(SV slice, Bases base);
 u64 string_to_u64(SV slice, Bases base);
 bool i32_to_string(String* str, i32 number, Bases base);
+bool is_number(u8 c);
+Bases bases_from_char(char c);
+i64 sv_cmp(SV a, SV b);
 
-
+#define SV_CMP_CSTR(sv, cstr) sv_cmp(sv, (SV){.pointer = cstr, .length = strlen(cstr)})
 #endif //AASM_UTILITY_H
 

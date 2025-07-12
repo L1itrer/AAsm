@@ -1,3 +1,2 @@
-mov rdi, rsi
-mov rdx, rsi
+use64
 ret

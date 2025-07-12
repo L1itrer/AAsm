@@ -93,7 +93,19 @@ static bool is_literal_character_valid(unsigned char c, i32 base)
     else result += c - '0';                       \
     } while(0)
 
+bool is_number(u8 c)
+{
+    return c >= '0' && c <= '9';
+}
 
+Bases bases_from_char(char c)
+{
+    if (c == 'x') return HEX;
+    if (c == 'o') return OCT;
+    if (c == 'b') return BIN;
+    if (c == 'd' || is_number(c)) return DEC;
+    return INVALID;
+}
 
 i32 sv_to_i32(SV slice, Bases base)
 {
@@ -135,5 +147,4 @@ i64 sv_cmp(SV str1, SV str2)
     }
     return 0;
 }
-#define SV_CMP_CSTR(sv, cstr) sv_cmp(sv, (SV){.pointer = cstr, .length = strlen(cstr)});
 
