@@ -82,11 +82,11 @@ void aasm_log(AasmLogLevel level, const char* format, ...);
 // number conversion
 
 typedef enum Bases{
-    INVALID,
-    BIN = 2,
-    OCT = 8,
-    DEC = 10,
-    HEX = 16,
+    BASE_INVALID,
+    BASE_BIN = 2,
+    BASE_OCT = 8,
+    BASE_DEC = 10,
+    BASE_HEX = 16,
 }Bases;
 
 i32 sv_to_i32(SV slice, Bases base);

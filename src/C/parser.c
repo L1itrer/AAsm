@@ -45,7 +45,7 @@ Token token_from_sv(SV word)
     if (is_number(word.pointer[0]))
     {
         Bases base = bases_from_char(word.pointer[1]);
-        if (base == INVALID)
+        if (base == BASE_INVALID)
         {
             aasm_log(LOG_ERROR, "Invalid number base: %c", word.pointer[1]);
             return ret_token;

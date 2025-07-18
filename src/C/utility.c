@@ -75,7 +75,7 @@ void aasm_log(AasmLogLevel level, const char* format, ...)
 
 static bool is_literal_character_valid(unsigned char c, i32 base)
 {
-    if (base != HEX)
+    if (base != BASE_HEX)
     {
         return c >= '0' && c <= '9' && (c - '0' < base);
     }
@@ -100,11 +100,11 @@ bool is_number(u8 c)
 
 Bases bases_from_char(char c)
 {
-    if (c == 'x') return HEX;
-    if (c == 'o') return OCT;
-    if (c == 'b') return BIN;
-    if (c == 'd' || is_number(c)) return DEC;
-    return INVALID;
+    if (c == 'x') return BASE_HEX;
+    if (c == 'o') return BASE_OCT;
+    if (c == 'b') return BASE_BIN;
+    if (c == 'd' || is_number(c)) return BASE_DEC;
+    return BASE_INVALID;
 }
 
 i32 sv_to_i32(SV slice, Bases base)
