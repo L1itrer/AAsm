@@ -2,6 +2,7 @@
 # write() - rdi: fd, rsi: ptr to string, rdx: str len
 mov rdx, rsi
 mov rsi, rdi
-mov rdi, 0x1
+mov edi, 0x1
 syscall
+ret
 
