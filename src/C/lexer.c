@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include "utility.h"
 
+// TODO: Proper lexer error reporting
 void lexer_init(Lexer *l, SV input_stream, String* storage)
 {
 	*l = (Lexer){
@@ -121,10 +122,21 @@ Token lexer_get(Lexer* l)
 		}
 		else
 		{
-			return LEX_INSTRUCTION;
+			return LEX_IDENTIFIER;
 		}
 	}
 	return LEX_EOF;
+}
+
+Token lexer_get_and_expect(Lexer *l, Token expected)
+{
+	Token tok = lexer_get(l);
+	if (tok != expected)
+	{
+		aasm_log(LOG_ERROR, "Unexpected token %d at line %d\n", tok, l->current_line);
+		return LEX_PARSE_ERROR;
+	}
+	return tok;
 }
 
 

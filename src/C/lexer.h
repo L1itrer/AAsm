@@ -6,14 +6,14 @@
 // TODO: sections
 // TODO: db, dw and such directives
 typedef enum Token{
-	LEX_EOF = 256,
+	LEX_EOF,
 	LEX_PARSE_ERROR,
 	LEX_LINE_FEED,
 	LEX_COMMENT,
 	LEX_COMMA,
 	LEX_INT_LIT,
 	LEX_LABEL,
-	LEX_INSTRUCTION,
+	LEX_IDENTIFIER,
 }Token;
 
 typedef struct Lexer{
