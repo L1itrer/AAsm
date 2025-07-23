@@ -7,7 +7,6 @@ display.exe.old
 /temp
 /test
 # a development helper file
-display.c
 instruction.asm
 *.bin
 *.txt
