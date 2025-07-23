@@ -143,13 +143,12 @@ RegisterKind register_kind_from_sv(SV str)
 
 int main(int argc, const char** argv)
 {
-    write(1, msg, sizeof(msg) - 1);
 
 
     String content = {0};
     if (!string_read_file("./test/hello.asm", &content)) return 1;
 
-    write(1, content.data, content.count);
+    printf("%.*s",content.count, content.data);
 
     printf("\n\n");
 

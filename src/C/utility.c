@@ -57,20 +57,20 @@ void aasm_log(AasmLogLevel level, const char* format, ...)
     switch(level)
     {
         case LOG_INFO:
-            write(2, "[INFO]: ", 8);
+            fprintf(stdout, "[INFO]: ");
             break;
         case LOG_WARNING:
-            write(2, "[WARNING]: ", 11);
+            fprintf(stderr, "[WARNING]: ");
             break;
         case LOG_ERROR:
-            write(2, "[ERROR]: ", 9);
+            fprintf(stderr, "[ERROR]: ");
             break;
     }
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
-    write(2, "\n", 1);
+    fprintf(stderr, "\n");
 }
 
 static bool is_literal_character_valid(unsigned char c, i32 base)

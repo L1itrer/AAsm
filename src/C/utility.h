@@ -6,10 +6,13 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdbool.h>
+#ifdef _WIN32
+#else
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#endif
 #include <errno.h>
 #include <assert.h>
 
