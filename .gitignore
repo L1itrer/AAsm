@@ -2,6 +2,7 @@
 /build
 nob
 nob.old
+nob.exe.old
 /temp
 *.bin
 *.txt
