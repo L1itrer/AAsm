@@ -528,16 +528,16 @@ InstructionKind instr_get_from_sv(SV sv)
 
 // token, printable string, keyword string (if applicable), char (if applicable)
 #define TOKENS \
-TOKEN_DEF(LEX_EOF, "eof", "", EOF) \
+TOKEN_DEF(LEX_EOF, "eof", "", ' ') \
 TOKEN_DEF(LEX_PARSE_ERROR, "err", "", ' ') \
 TOKEN_DEF(LEX_LINE_FEED, "newline", "", ' ') \
-TOKEN_DEF(LEX_COMMENT, "#", "", '#') \
+TOKEN_DEF(LEX_COMMENT, "comment", "", '#') \
 TOKEN_DEF(LEX_COMMA, ",", "", ',') \
 TOKEN_DEF(LEX_INT_LIT, "int", "", ' ' ) \
 TOKEN_DEF(LEX_LABELDEF, "label", "", ' ') \
 TOKEN_DEF(LEX_IDENTIFIER, "id", "", ' ') \
-TOKEN_DEF(LEX_REGISTER, "reg", "", ' ') \
-TOKEN_DEF(LEX_INSTRUCTION, "instr", "", ' ') \
+TOKEN_DEF(LEX_REGISTER, "regster", "", ' ') \
+TOKEN_DEF(LEX_INSTRUCTION, "instruction", "", ' ') \
 
 typedef enum Token{
 	#define TOKEN_DEF(tok, prt, str,char) tok,
@@ -594,7 +594,7 @@ void token_print(Lexer* l, Token tok)
 	}
 	else if (tok == LEX_INT_LIT)
 	{
-		printf(", |%ld", l->value);
+		printf(", |%ld|", l->value);
 	}
 	printf("\n");
 }
@@ -737,59 +737,96 @@ Token lexer_get_and_expect(Lexer *l, Token expected)
 	return tok;
 }
 
+typedef struct TranslationUnit{
+	i32 err_count, warn_count;
+	const char* file_path;
+	const char* output_path;
+	Lexer l;
+	String file_content;
+	String str_storage;
+	String code;
+}TranslationUnit;
+
+
+bool tu_init(TranslationUnit* tu, const char* file_path, const char* output_path)
+{
+	tu->file_path = file_path;
+	tu->output_path = output_path;
+	if (!string_read_file(file_path, &tu->file_content)) return 1;
+	SV file_sv = (SV){
+		.pointer = tu->file_content.data, 
+		.length = tu->file_content.count
+	};
+
+	lexer_init(&tu->l, file_sv, &tu->str_storage);
+	
+	return true;
+}
+
+void parse_error(TranslationUnit* tu, const char* format, ...)
+{
+	tu->err_count += 1;
+	fprintf(stderr, "%s:%u error: ", tu->file_path, tu->l.current_line);
+	
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fprintf(stderr, "\n");
+	skip_until_newline(&tu->l);
+}
+
 int main(void)
 {
-    String content = {0};
-    if (!string_read_file("./test/hello.asm", &content)) return 1;
-
-    printf("%.*s", (int)content.count, content.data);
-
-    printf("\n\n");
-
-//    parse_file(&content, &tokens);
-
-	Lexer l = {0};
-	String str_storage = {0};
-	SV file_sv = (SV){.pointer = content.data, .length = content.count};
-	lexer_init(&l, file_sv, &str_storage);
-	i32 errors = 0;
-	i32 warnings = 0;
+	TranslationUnit unit = {0};
+	Lexer* l = &unit.l;
+	tu_init(&unit, "./test/hello.asm", "");
 	
 	Token tok = LEX_PARSE_ERROR;
 	while (true)
 	{
-		tok = lexer_get(&l);
-		token_print(&l, tok);
+		tok = lexer_get(l);
+		token_print(l, tok);
 		if (tok == LEX_EOF) break;
 		if (tok == LEX_LINE_FEED)
 		{
 			// TODO: handling of labels
-			tok = lexer_get(&l);
-			token_print(&l, tok);
-			if (tok == LEX_EOF) break;
-			if (tok != LEX_IDENTIFIER)
+repeat:
+			tok = lexer_get(l);
+			token_print(l, tok);
+			// all acceptable tokens after newline
+			switch (tok)
 			{
-				if (tok != LEX_COMMENT)
-				{
-					printf("A line needs to begin with an instruction\n");
-					continue;
-				}
+				case LEX_LINE_FEED:
+					goto repeat;
+					break;
+				case LEX_COMMENT:
+					{
+						
+					} break;
+				case LEX_IDENTIFIER: // HACK: identifier is not acceptable
+					{
+						InstructionKind instr = instr_get_from_sv(l->identifier);
+						if (instr == INSTR__Invalid)
+						{
+							parse_error(&unit, "Invalid identifier: |%.*s|", (int)l->identifier.length, l->identifier.pointer);
+							break;
+						}
+						assert(instr_opcode[instr] == 0);
+					}break;
+				case LEX_EOF:
+					{
+						goto end;
+					}break;
+				default:
+					parse_error(&unit, "Unexpected token |%s| at the beginning of a line", token_printable[tok]);
 			}
-			InstructionKind instr = instr_get_from_sv(l.identifier);
-			if (instr == INSTR__Invalid)
-			{
-				aasm_log(LOG_ERROR, "Invalid instruction: |%.*s| at line %d\n", l.identifier.length, l.identifier.pointer, l.current_line);
-				// TODO: Advance to next line on error
-				continue;
-			}
-			assert(instr_opcode[instr] == 0);
-			// printf("Instruction: %s, sub_instr count: %d\n", instr_text[instr], instr_argc[instr]);
 			continue;
 			// TODO: Special handling of prefixes
 		}
 		if (tok == LEX_IDENTIFIER)
 		{
-			RegisterKind reg = register_kind_from_sv(l.identifier);
+			RegisterKind reg = register_kind_from_sv(l->identifier);
 			if (reg != REG_INVALID)
 			{
 				// printf("Register: %s, encoding: %d\n", register_strings[reg], register_encodings[reg]);
@@ -800,5 +837,7 @@ int main(void)
 			// printf("Int literal: %ld\n", l.value);
 		}
 	}
+end:
+	printf("Compilation finished, errors: %d, warnings: %d\n", unit.err_count, unit.warn_count);
     return 0;
 }
