@@ -271,172 +271,11 @@ i32 sv_cmp_cstr(SV a, const char* b)
 }
 
 
-// ---------------------------------------------------------
-// ------------------------LEXER----------------------------
-// ---------------------------------------------------------
-
-typedef enum Token{
-	LEX_EOF,
-	LEX_PARSE_ERROR,
-	LEX_LINE_FEED,
-	LEX_COMMENT,
-	LEX_COMMA,
-	LEX_INT_LIT,
-	LEX_LABEL,
-	LEX_IDENTIFIER,
-}Token;
-
-typedef struct Lexer{
-	SV input_stream;
-	u32 current_line;
-	u32 line_character;
-	u32 byte_offset;
-	Token token;
-	SV identifier;
-	i64 value;
-
-	String* string_storage;
-}Lexer;
 
 
-void lexer_init(Lexer *l, SV input_stream, String* storage)
-{
-	*l = (Lexer){
-		.input_stream = input_stream,
-		.string_storage = storage,
-	};
-}
-
-static char get_character(Lexer* l)
-{
-	char c = l->input_stream.pointer[l->byte_offset];
-	l->byte_offset += 1;
-	return c;
-}
-
-static char peek_character(Lexer* l)
-{
-	if (l->byte_offset >= l->input_stream.length) return 0;
-	return l->input_stream.pointer[l->byte_offset+1];
-}
-
-static bool is_space(char c)
-{
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r'  || c == '\f';
-}
-// static void skip_whitespace(Lexer* l)
-// {
-// 	char c = 0;
-// 	do
-// 	{
-// 		l->byte_offset += 1;
-// 		c = l->input_stream.pointer[l->byte_offset];
-// 	} while (is_space(c) && l->byte_offset < l->input_stream.length);
-// 	l->byte_offset -= 1; // go back newline is a token
-// }
-
-static void skip_until_newline(Lexer* l)
-{
-	char c = 0;
-	do
-	{
-		l->byte_offset += 1;
-		c = l->input_stream.pointer[l->byte_offset];
-	} while (c != '\n' && l->byte_offset < l->input_stream.length);
-}
-
-Token lexer_get(Lexer* l)
-{
-	// u64 flen = l->input_stream.length;
-	for (;l->byte_offset < l->input_stream.length;)
-	{
-		u32 curr_offset = l->byte_offset;
-		char c = get_character(l);
-		if (is_space(c) && c != '\n')
-		{
-			continue;
-		}
-		if (c == '#')
-		{	
-			skip_until_newline(l);
-			return LEX_COMMENT;
-		}
-		else if (c == ',')
-		{
-			return LEX_COMMA;
-			// TODO: commas
-		}
-		else if (c == '\n')
-		{
-			l->current_line += 1;
-			return LEX_LINE_FEED;
-		}
-
-//		while (!is_space(c))
-//		{
-//			if (l->byte_offset >= flen)
-//			{
-//				return LEX_EOF;
-//			}
-//			c = get_character(l);
-//		}
-		while (true) 
-		{
-			c = peek_character(l);
-			if (c == 0) return LEX_EOF;
-			l->byte_offset += 1;
-			if (c == ',')
-			{
-				break;
-			}
-			if (is_space(c) || c == '\n') break;
-		}
-		SV word = (SV){
-			.pointer = l->input_stream.pointer + curr_offset, 
-			.length = l->byte_offset - curr_offset,
-		};
-		l->identifier = word;
-		if (is_number(word.pointer[0]))
-		{
-			// TODO: introduce base from sv not from char
-			Bases base = bases_from_char(word.pointer[1]);
-			if (base == BASE_INVALID)
-			{
-				aasm_log(LOG_ERROR, "Invalid number base: %c at line %u", c, l->current_line);
-				return LEX_PARSE_ERROR;
-			}
-			// HACK: 
-			word.pointer += 2;
-			word.length -= 2;
-			i32 num = sv_to_i32(word, base);
-			u32 unum = *(u32*)&num;
-			l->value = unum;
-			return LEX_INT_LIT;
-		}
-		else if (word.pointer[word.length-1] == ':')
-		{
-			// TODO: storing the labels
-			return LEX_LABEL;
-		}
-		else
-		{
-			return LEX_IDENTIFIER;
-		}
-	}
-	return LEX_EOF;
-}
-
-Token lexer_get_and_expect(Lexer *l, Token expected)
-{
-	Token tok = lexer_get(l);
-	if (tok != expected)
-	{
-		aasm_log(LOG_ERROR, "Unexpected token %d at line %d\n", tok, l->current_line);
-		return LEX_PARSE_ERROR;
-	}
-	return tok;
-}
-
+// -------------------------------------------------------------
+// -----------------------REGISTERS-----------------------------
+// -------------------------------------------------------------
 // TODO: segment registers
 typedef enum Type : u32{
 	TYPE_INVALID,
@@ -583,6 +422,13 @@ RegisterKind register_kind_from_sv(SV str)
 	return REG_INVALID;
 }
 
+
+
+// -------------------------------------------------------------------
+// ------------------------INSTRUCTIONS-------------------------------
+// -------------------------------------------------------------------
+
+
 #define INSTR_ARGS1(first) (first)
 #define INSTR_ARGS2(first, second) ((first) | (second << 8))
 #define INSTR_ARGS3(first, second, third) ((first) | (second << 8) | (third << 16))
@@ -675,6 +521,222 @@ InstructionKind instr_get_from_sv(SV sv)
 	return INSTR__Invalid;
 }
 
+
+// ---------------------------------------------------------
+// ------------------------LEXER----------------------------
+// ---------------------------------------------------------
+
+// token, printable string, keyword string (if applicable), char (if applicable)
+#define TOKENS \
+TOKEN_DEF(LEX_EOF, "eof", "", EOF) \
+TOKEN_DEF(LEX_PARSE_ERROR, "err", "", ' ') \
+TOKEN_DEF(LEX_LINE_FEED, "newline", "", ' ') \
+TOKEN_DEF(LEX_COMMENT, "#", "", '#') \
+TOKEN_DEF(LEX_COMMA, ",", "", ',') \
+TOKEN_DEF(LEX_INT_LIT, "int", "", ' ' ) \
+TOKEN_DEF(LEX_LABELDEF, "label", "", ' ') \
+TOKEN_DEF(LEX_IDENTIFIER, "id", "", ' ') \
+TOKEN_DEF(LEX_REGISTER, "reg", "", ' ') \
+TOKEN_DEF(LEX_INSTRUCTION, "instr", "", ' ') \
+
+typedef enum Token{
+	#define TOKEN_DEF(tok, prt, str,char) tok,
+	TOKENS
+	#undef TOKEN_DEF
+}Token;
+
+const char* token_printable[] = {
+	#define TOKEN_DEF(tok, print, str, char) print,
+	TOKENS
+	#undef TOKEN_DEF
+};
+
+const char token_chars[] = {
+	#define TOKEN_DEF(t, prt, s, char) char,
+	TOKENS
+	#undef TOKEN_DEF
+};
+
+
+typedef struct Lexer{
+	SV input_stream;
+	u32 current_line;
+	u32 line_character;
+	u32 byte_offset;
+	Token token;
+
+	RegisterKind reg;
+	InstructionKind instr;
+	SV identifier;
+	i64 value;
+
+	String* string_storage;
+}Lexer;
+
+void token_print(Lexer* l, Token tok)
+{
+	printf("Token: |%s|", token_printable[tok]);
+	if (token_chars[tok] != ' ')
+	{
+		printf(", %c", token_chars[tok]);
+	}
+	if (tok == LEX_REGISTER)
+	{
+		printf(", |%s|", register_strings[l->reg]);
+	}
+	else if (tok == LEX_INSTRUCTION)
+	{
+		printf(", |%s|", instr_text[l->instr]);
+	}
+	else if (tok == LEX_IDENTIFIER)
+	{
+		printf(", |%.*s|", (int)l->identifier.length, l->identifier.pointer);
+	}
+	else if (tok == LEX_INT_LIT)
+	{
+		printf(", |%ld", l->value);
+	}
+	printf("\n");
+}
+
+void lexer_init(Lexer *l, SV input_stream, String* storage)
+{
+	*l = (Lexer){
+		.input_stream = input_stream,
+		.string_storage = storage,
+	};
+}
+
+static char get_character(Lexer* l)
+{
+	char c = l->input_stream.pointer[l->byte_offset];
+	l->byte_offset += 1;
+	return c;
+}
+
+static char peek_character(Lexer* l)
+{
+	if (l->byte_offset >= l->input_stream.length) return 0;
+	return l->input_stream.pointer[l->byte_offset+1];
+}
+
+static bool is_space(char c)
+{
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r'  || c == '\f';
+}
+// static void skip_whitespace(Lexer* l)
+// {
+// 	char c = 0;
+// 	do
+// 	{
+// 		l->byte_offset += 1;
+// 		c = l->input_stream.pointer[l->byte_offset];
+// 	} while (is_space(c) && l->byte_offset < l->input_stream.length);
+// 	l->byte_offset -= 1; // go back newline is a token
+// }
+
+static void skip_until_newline(Lexer* l)
+{
+	char c = 0;
+	do
+	{
+		l->byte_offset += 1;
+		c = l->input_stream.pointer[l->byte_offset];
+	} while (c != '\n' && l->byte_offset < l->input_stream.length);
+}
+
+Token lexer_get(Lexer* l)
+{
+	// u64 flen = l->input_stream.length;
+	for (;l->byte_offset < l->input_stream.length;)
+	{
+		u32 curr_offset = l->byte_offset;
+		char c = get_character(l);
+		if (is_space(c) && c != '\n')
+		{
+			continue;
+		}
+		if (c == '#')
+		{	
+			skip_until_newline(l);
+			return LEX_COMMENT;
+		}
+		else if (c == ',')
+		{
+			return LEX_COMMA;
+			// TODO: commas
+		}
+		else if (c == '\n')
+		{
+			l->current_line += 1;
+			return LEX_LINE_FEED;
+		}
+
+//		while (!is_space(c))
+//		{
+//			if (l->byte_offset >= flen)
+//			{
+//				return LEX_EOF;
+//			}
+//			c = get_character(l);
+//		}
+		while (true) 
+		{
+			c = peek_character(l);
+			if (c == 0) return LEX_EOF;
+			l->byte_offset += 1;
+			if (c == ',')
+			{
+				break;
+			}
+			if (is_space(c) || c == '\n') break;
+		}
+		SV word = (SV){
+			.pointer = l->input_stream.pointer + curr_offset, 
+			.length = l->byte_offset - curr_offset,
+		};
+		l->identifier = word;
+		if (is_number(word.pointer[0]))
+		{
+			// TODO: introduce base from sv not from char
+			Bases base = bases_from_char(word.pointer[1]);
+			if (base == BASE_INVALID)
+			{
+				aasm_log(LOG_ERROR, "Invalid number base: %c at line %u", c, l->current_line);
+				return LEX_PARSE_ERROR;
+			}
+			// HACK: 
+			word.pointer += 2;
+			word.length -= 2;
+			i32 num = sv_to_i32(word, base);
+			u32 unum = *(u32*)&num;
+			l->value = unum;
+			return LEX_INT_LIT;
+		}
+		else if (word.pointer[word.length-1] == ':')
+		{
+			// TODO: storing the labels
+			return LEX_LABELDEF;
+		}
+		else
+		{
+			return LEX_IDENTIFIER;
+		}
+	}
+	return LEX_EOF;
+}
+
+Token lexer_get_and_expect(Lexer *l, Token expected)
+{
+	Token tok = lexer_get(l);
+	if (tok != expected)
+	{
+		aasm_log(LOG_ERROR, "Unexpected token %d at line %d\n", tok, l->current_line);
+		return LEX_PARSE_ERROR;
+	}
+	return tok;
+}
+
 int main(void)
 {
     String content = {0};
@@ -690,17 +752,22 @@ int main(void)
 	String str_storage = {0};
 	SV file_sv = (SV){.pointer = content.data, .length = content.count};
 	lexer_init(&l, file_sv, &str_storage);
+	i32 errors = 0;
+	i32 warnings = 0;
 	
 	Token tok = LEX_PARSE_ERROR;
 	while (true)
 	{
 		tok = lexer_get(&l);
+		token_print(&l, tok);
 		if (tok == LEX_EOF) break;
 		if (tok == LEX_LINE_FEED)
 		{
 			// TODO: handling of labels
 			tok = lexer_get(&l);
-			if (tok != LEX_IDENTIFIER && tok != LEX_COMMENT)
+			token_print(&l, tok);
+			if (tok == LEX_EOF) break;
+			if (tok != LEX_IDENTIFIER)
 			{
 				if (tok != LEX_COMMENT)
 				{
@@ -711,12 +778,12 @@ int main(void)
 			InstructionKind instr = instr_get_from_sv(l.identifier);
 			if (instr == INSTR__Invalid)
 			{
-				aasm_log(LOG_ERROR, "Oopsy doopsie! you did a fucky wacky! Invalid instruction: %.*s\n at line ", l.identifier.length, l.identifier.pointer, l.current_line);
+				aasm_log(LOG_ERROR, "Invalid instruction: |%.*s| at line %d\n", l.identifier.length, l.identifier.pointer, l.current_line);
 				// TODO: Advance to next line on error
 				continue;
 			}
 			assert(instr_opcode[instr] == 0);
-			printf("Instruction: %s, sub_instr count: %d\n", instr_text[instr], instr_argc[instr]);
+			// printf("Instruction: %s, sub_instr count: %d\n", instr_text[instr], instr_argc[instr]);
 			continue;
 			// TODO: Special handling of prefixes
 		}
@@ -725,14 +792,13 @@ int main(void)
 			RegisterKind reg = register_kind_from_sv(l.identifier);
 			if (reg != REG_INVALID)
 			{
-				printf("Register: %s, encoding: %d\n", register_strings[reg], register_encodings[reg]);
+				// printf("Register: %s, encoding: %d\n", register_strings[reg], register_encodings[reg]);
 			}
 		}
 		if (tok == LEX_INT_LIT)
 		{
-			printf("Int literal: %ld\n", l.value);
+			// printf("Int literal: %ld\n", l.value);
 		}
-		//printf("Tok id: |%d|, word: |%.*s|, value: |%lu|\n", tok, l.identifier.length, l.identifier.pointer, l.value);
 	}
     return 0;
 }
