@@ -1,5 +1,3 @@
-const char msg[] = "Ready? Set! GO!\x0A";
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +15,7 @@ const char msg[] = "Ready? Set! GO!\x0A";
 #include <assert.h>
 
 
+const char msg[] = "Ready? Set! GO!\x0A";
 // ---------------------------------------------------------
 // -----------------------UTILITY---------------------------
 // ---------------------------------------------------------
@@ -294,7 +293,7 @@ typedef struct Lexer{
 	u32 byte_offset;
 	Token token;
 	SV identifier;
-	u64 value;
+	i64 value;
 
 	String* string_storage;
 }Lexer;
@@ -325,16 +324,16 @@ static bool is_space(char c)
 {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r'  || c == '\f';
 }
-static void skip_whitespace(Lexer* l)
-{
-	char c = 0;
-	do
-	{
-		l->byte_offset += 1;
-		c = l->input_stream.pointer[l->byte_offset];
-	} while (is_space(c) && l->byte_offset < l->input_stream.length);
-	l->byte_offset -= 1; // go back newline is a token
-}
+// static void skip_whitespace(Lexer* l)
+// {
+// 	char c = 0;
+// 	do
+// 	{
+// 		l->byte_offset += 1;
+// 		c = l->input_stream.pointer[l->byte_offset];
+// 	} while (is_space(c) && l->byte_offset < l->input_stream.length);
+// 	l->byte_offset -= 1; // go back newline is a token
+// }
 
 static void skip_until_newline(Lexer* l)
 {
@@ -348,7 +347,7 @@ static void skip_until_newline(Lexer* l)
 
 Token lexer_get(Lexer* l)
 {
-	u64 flen = l->input_stream.length;
+	// u64 flen = l->input_stream.length;
 	for (;l->byte_offset < l->input_stream.length;)
 	{
 		u32 curr_offset = l->byte_offset;
@@ -676,12 +675,12 @@ InstructionKind instr_get_from_sv(SV sv)
 	return INSTR__Invalid;
 }
 
-int main(int argc, const char** argv)
+int main(void)
 {
     String content = {0};
     if (!string_read_file("./test/hello.asm", &content)) return 1;
 
-    printf("%.*s",content.count, content.data);
+    printf("%.*s", (int)content.count, content.data);
 
     printf("\n\n");
 
@@ -695,7 +694,7 @@ int main(int argc, const char** argv)
 	Token tok = LEX_PARSE_ERROR;
 	while (true)
 	{
-		Token tok = lexer_get(&l);
+		tok = lexer_get(&l);
 		if (tok == LEX_EOF) break;
 		if (tok == LEX_LINE_FEED)
 		{
@@ -731,7 +730,7 @@ int main(int argc, const char** argv)
 		}
 		if (tok == LEX_INT_LIT)
 		{
-			printf("Int literal: %d\n", l.value);
+			printf("Int literal: %ld\n", l.value);
 		}
 		//printf("Tok id: |%d|, word: |%.*s|, value: |%lu|\n", tok, l.identifier.length, l.identifier.pointer, l.value);
 	}
