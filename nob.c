@@ -14,10 +14,10 @@ int main(int argc, char **argv)
     Nob_File_Paths file_paths = {0};
 #ifdef WIN32
 	Nob_Procs procs = {0};
-	nob_cmd_append(&cmd, "cl", "-Wall", "-Zi", "-Fo:build\\", "-Fd:build\\", "-Fe:build\\aasm.exe", "-EHsc", "-D_CRT_SECURE_NO_WARNINGS", "src\\C\\main.c");
+	nob_cmd_append(&cmd, "cl", "-Wall", "-Zi", "-Fo:build\\", "-Fd:build\\", "-Fe:build\\aasm.exe", "-EHsc", "-D_CRT_SECURE_NO_WARNINGS", "src\\C\\aasm.c");
 #else
     if (!nob_read_entire_dir("./src/C", &file_paths)) return 1;
-    nob_cmd_append(&cmd, "gcc", "-Wall", "-Wextra", "-o", "./build/aasm", "-ggdb", "./src/C/main.c");
+    nob_cmd_append(&cmd, "gcc", "-Wall", "-Wextra", "-o", "./build/aasm", "-ggdb", "./src/C/aasm.c");
 //    for (size_t i = 0;i < file_paths.count;++i)
 //    {
 //        const char* curr_file = file_paths.items[i];
