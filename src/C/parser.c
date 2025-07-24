@@ -25,15 +25,15 @@ void skip_until_separator(String* file, u64* i)
 Instruction sv_to_instruction(SV word)
 {
     // TODO: make instruction parsing case insensitive
-    if (SV_CMP_CSTR(word, "mov") == 0)
+    if (sv_cmp_cstr(word, "mov") == 0)
     {
         return MOV;
     }
-    if (SV_CMP_CSTR(word, "ret") == 0)
+    if (sv_cmp_cstr(word, "ret") == 0)
     {
         return RET;
     }
-    if (SV_CMP_CSTR(word, "syscall") == 0)
+    if (sv_cmp_cstr(word, "syscall") == 0)
     {
         return MOV;
     }

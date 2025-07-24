@@ -92,7 +92,7 @@ Token lexer_get(Lexer* l)
 			{
 				break;
 			}
-			if (is_space(c)) break;
+			if (is_space(c) || c == '\n') break;
 		}
 		SV word = (SV){
 			.pointer = l->input_stream.pointer + curr_offset, 
@@ -114,6 +114,7 @@ Token lexer_get(Lexer* l)
 			i32 num = sv_to_i32(word, base);
 			u32 unum = *(u32*)&num;
 			l->value = unum;
+			return LEX_INT_LIT;
 		}
 		else if (word.pointer[word.length-1] == ':')
 		{

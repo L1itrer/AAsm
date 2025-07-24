@@ -137,14 +137,28 @@ i32 sv_to_i32(SV slice, Bases base)
     return result;
 }
 
-i64 sv_cmp(SV str1, SV str2)
+i32 sv_cmp(SV str1, SV str2)
 {
-    if (str1.length != str2.length) return (i64)(str1.length - str2.length);
+	// NOTE: some size considerations are necessery
+    if (str1.length != str2.length) return (i32)((i32)str1.length - (i32)str2.length);
     for (u64 i = 0;i < str1.length;++i)
     {
         if (str1.pointer[i] != str2.pointer[i])
             return str1.pointer[i] - str2.pointer[i];
     }
     return 0;
+}
+
+
+i32 sv_cmp_cstr(SV a, const char* b)
+{
+	size_t blen = strlen(b);
+	if (a.length != blen) return (i32)((i32)a.length - (i32)blen);
+	for (u64 i = 0;i < a.length;++i)
+	{
+		if (a.pointer[i] != b[i])
+			return a.pointer[i] - b[i];
+	}
+	return 0;
 }
 

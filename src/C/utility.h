@@ -97,8 +97,8 @@ u64 string_to_u64(SV slice, Bases base);
 bool i32_to_string(String* str, i32 number, Bases base);
 bool is_number(u8 c);
 Bases bases_from_char(char c);
-i64 sv_cmp(SV a, SV b);
+i32 sv_cmp(SV a, SV b);
 
-#define SV_CMP_CSTR(sv, cstr) sv_cmp(sv, (SV){.pointer = cstr, .length = strlen(cstr)})
+i32 sv_cmp_cstr(SV a, const char* b);
 #endif //AASM_UTILITY_H
 
