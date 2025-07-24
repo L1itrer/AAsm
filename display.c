@@ -1,4 +1,6 @@
 #define NOB_IMPLEMENTATION
+#define NOB_EXPERIMENTAL_DELETE_OLD
+
 #include "nob.h"
 
 int main(int argc, char** argv)
@@ -8,7 +10,7 @@ int main(int argc, char** argv)
 	nob_cmd_append(&cmd, "fasm", "instruction.asm");
 	if (!nob_cmd_run_sync(cmd)) return 1;
 	Nob_String_Builder sb = {0};
-	if (!nob_read_entire_file(".\\instruction.asm", &sb)) return 1;
+	if (!nob_read_entire_file("instruction.asm", &sb)) return 1;
 	int subtracted = 0;
 	for (int i = 0;i < sb.count;++i)
 	{
@@ -19,7 +21,7 @@ int main(int argc, char** argv)
 		}
 	}
 	sb.count = 0;
-	nob_read_entire_file(".\\instruction.bin", &sb);
+	nob_read_entire_file("instruction.bin", &sb);
 	for (int i = 0;i < sb.count;++i)
 	{
 		printf("%02x ", sb.items[i] & 0xff);
