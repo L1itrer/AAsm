@@ -41,7 +41,7 @@ typedef uint64_t u64;
 
 typedef struct String
 {
-    char* data;
+    char* items;
     u64 count;
     u64 capacity;
 } String;
@@ -123,9 +123,9 @@ bool string_read_file(const char* path, String* str)
     if (new_count > str->capacity)
     {
         str->capacity = new_count;
-        str->data = aasm_realloc(str->data, str->capacity);
+        str->items = aasm_realloc(str->items, str->capacity);
     }
-    fread(str->data + str->count, file_size, 1, file);
+    fread(str->items + str->count, file_size, 1, file);
     if (ferror(file)) goto failure;
     str->count = new_count;
     fclose(file);
@@ -461,12 +461,12 @@ args[2] = (pt >> 16) & 0xff; args[3] = pt >> 24;
 
 // these are extra opcode flags to be OR-ed
 #define NO_EXTRA 0x00
-#define HAS_IMM 0x02
+#define HAS_IMM 0x04
 #define IMM_8 0x00
-#define IMM_16 0x04
-#define IMM_32 0x08
-#define IMM_64 0x0C
-#define REG_IN_OPCODE 0x01
+#define IMM_16 0x01
+#define IMM_32 0x02
+#define IMM_64 0x03
+#define REG_IN_OPCODE 0x08
 
 
 // kind, text, opcode, opcode extention, argc, args_packed
@@ -548,7 +548,7 @@ InstructionKind instr_get_from_sv(SV sv)
 
 InstructionKind instr_match_types(InstructionKind instr_group, i32 argc, Type types[4])
 {
-	for (i32 i = instr_group+1;i < (instr_argc[instr_group] + instr_group+1);++i)
+	for (u32 i = instr_group+1;i < (instr_argc[instr_group] + instr_group+1);++i)
 	{
 		if (instr_argc[i] != argc) continue;
 		INSTR_GET_ARGS(instr_args[i]);
@@ -593,7 +593,149 @@ InstructionKind instr_match_types(InstructionKind instr_group, i32 argc, Type ty
 	}
 	return INSTR__Invalid;
 }
+#define REX_DEFAULT 0x40
+#define REX_W 0b00001000
+#define REX_R 0b00000100
+#define REX_X 0b00000010
+#define REX_B 0b00000001
 
+int ipow(int base, int exp)
+{
+    int result = 1;
+    for (;;)
+    {
+        if (exp & 1)
+            result *= base;
+        exp >>= 1;
+        if (!exp)
+            break;
+        base *= base;
+    }
+
+    return result;
+}
+
+static void write_imm(String* code, i64 imm, i32 byte_count)
+{
+	for (i32 i = 0;i < byte_count;++i)
+	{
+		aasm_append(code, (u8)(imm & 0xff));
+		imm >>= 8;
+	}
+	  //	u8 bytes[24] = {0};
+//	i32 count = 0;
+//	while (imm != 0)
+//	{
+//		bytes[count] = (imm & 0xff);
+//		imm >>= 8;
+//		count += 1;
+//	}
+//	for (int i = 0;i < byte_count;++i)
+//	{
+//		aasm_append(code, bytes[count-i-1]);
+//	}
+}
+
+static void write_opcode(String* code, u32 opcode)
+{
+	u8 bytes[8] = {0};
+	i32 count = 0;
+	while (opcode != 0)
+	{
+		bytes[count] = (opcode & 0xff);
+		opcode >>= 8;
+		count += 1;
+	}
+	for (i32 i = count-1;i >= 0;--i)
+	{
+		aasm_append(code, bytes[i]);
+	}
+}
+
+bool instr_assemble(String* code, InstructionKind instruction, Type given_args[4], i32 imms[4], RegisterKind regs[4])
+{
+	INSTR_GET_ARGS(instr_args[instruction]);
+	i32 argc = instr_argc[instruction];
+	u8 rex_prefix = REX_DEFAULT;
+	bool bit16_prefix = false;
+	u32 opcode = instr_opcode[instruction];
+	i64 imm = 0;
+	// TODO: add other modes to mod_rm, there is no handling of memory operands so far so it's
+	// impossible to infer them, for now it's hardcoded as a direct register-register addressing
+	// u8 sib = 0;
+	u8 mod_rm = 0b11000000;
+	bool write_modrm = false;
+	for (i32 i = 0;i < argc;++i)
+	{
+		switch (args[i])
+		{
+		case TYPE_IMM8:
+		case TYPE_IMM16:
+		case TYPE_IMM32:
+		case TYPE_IMM64:
+			imm = imms[i];
+			break;
+		case TYPE_RM64:
+			rex_prefix |= REX_W;
+			if (regs[i] > REG__RequiresREXR) rex_prefix |= REX_B;
+			goto type_rm32;
+		case TYPE_RM16:
+			bit16_prefix = true;
+			// fallthrough
+		case TYPE_RM8:
+		case TYPE_RM32:
+			type_rm32:
+			{
+				if (type_is_gpr(given_args[i]))
+				{
+					u8 reg_code = register_encodings[regs[i]];
+					mod_rm |= reg_code;
+				}
+				else assert(false && "memory not yet implemented");
+				write_modrm = true;
+			}
+			break;
+		case TYPE_R64:
+			rex_prefix |= REX_W;
+			if (regs[i] > REG__RequiresREXR) rex_prefix |= REX_R;
+			goto type_r32;
+		case TYPE_R16:
+			bit16_prefix = true;
+			// fallthrough
+		case TYPE_R8:
+		case TYPE_R32:
+			type_r32:
+			{
+				u8 reg_code = register_encodings[regs[i]];
+				if (instr_opcextra[instruction] & REG_IN_OPCODE)
+				{
+					opcode |= reg_code;
+					break;
+				}
+				mod_rm |= (reg_code << 3);
+				write_modrm = true;
+			}
+			break;
+		default:
+			assert(false && "not yet implemented type");
+		}
+	}
+	if (bit16_prefix && (rex_prefix != REX_DEFAULT))
+	{
+		assert(false && "Somehow the instruction is both 16 bit and 64 bit");
+	}
+	if (bit16_prefix) aasm_append(code, 0x66);
+	if (rex_prefix != REX_DEFAULT) aasm_append(code, rex_prefix);
+	write_opcode(code, opcode);
+	if (write_modrm) aasm_append(code, mod_rm);
+	// TODO:: here be sib
+	// TODO:: here be disp
+	if (instr_opcextra[instruction] & HAS_IMM)
+	{
+		write_imm(code, imm, ipow(2, (instr_opcextra[instruction] & 0x03)));
+	}
+	return true;
+}
 
 // ---------------------------------------------------------
 // ------------------------LEXER----------------------------
@@ -827,7 +969,7 @@ bool tu_init(TranslationUnit* tu, const char* file_path, const char* output_path
 	tu->output_path = output_path;
 	if (!string_read_file(file_path, &tu->file_content)) return 1;
 	SV file_sv = (SV){
-		.pointer = tu->file_content.data, 
+		.pointer = tu->file_content.items, 
 		.length = tu->file_content.count
 	};
 
@@ -912,17 +1054,9 @@ repeat:
 								argc += 1;
 							}
 						}
-						printf("Instr |%s|: ", instr_text[instr]);
-						for (int i = 0;i < argc;++i)
-						{
-							if (arg_type[i] == TYPE_IMM8) printf("imm |%d|, ", imm[i]);
-							else printf("reg: %s, ", register_strings[reg[i]]);
-						}
-						printf("\n");
 						InstructionKind specific_instr = instr_match_types(instr, argc, arg_type);
 						// TODO: better message for type mismatch
-						if (specific_instr == INSTR__Invalid) parse_error(&unit, "Could not match the type of instruction");
-						else printf("%s: opcode %x\n", instr_text[specific_instr], instr_opcode[specific_instr]);
+						instr_assemble(&unit.code, specific_instr, arg_type, imm, reg);
 						goto repeat;
 					}break;
 				case LEX_EOF:
@@ -949,6 +1083,12 @@ repeat:
 		}
 	}
 end:
-	printf("Compilation finished, errors: %d, warnings: %d\n", unit.err_count, unit.warn_count);
+	printf("1 passes, %lu bytes\n", unit.code.count);
+	printf("Compilation finished, %d errors, %d warnings\n", unit.err_count, unit.warn_count);
+	for (u64 i = 0;i < unit.code.count;++i)
+	{
+		printf("%02x ", unit.code.items[i] & 0xff);
+	}
+	printf("\n");
     return 0;
 }
