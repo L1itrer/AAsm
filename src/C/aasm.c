@@ -7,6 +7,7 @@
 #ifdef _WIN32
 #else
 #include <unistd.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -1090,5 +1091,17 @@ end:
 		printf("%02x ", unit.code.items[i] & 0xff);
 	}
 	printf("\n");
+
+
+	int (*executable_code)(const char*, unsigned long) = mmap(0, unit.code.count, PROT_EXEC | PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (executable_code == MAP_FAILED)
+	{
+		aasm_log(LOG_ERROR, "Could not map memory: %s\n", strerror(errno));
+	}
+	memcpy(executable_code, unit.code.items, unit.code.count);
+	int res = executable_code("Hello world!\n", 13);
+	printf("res = %d\n", res);
+
+
     return 0;
 }
