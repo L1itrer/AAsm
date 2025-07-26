@@ -54,6 +54,8 @@ typedef struct StringView
 
 typedef StringView SV;
 
+#define SV_PRINT(sv) (sv).length, (sv).pointer
+
 bool string_read_file(const char* path, String* str);
 
 
@@ -277,12 +279,14 @@ i32 sv_cmp_cstr(SV a, const char* b)
 // -----------------------REGISTERS-----------------------------
 // -------------------------------------------------------------
 // TODO: segment registers
-typedef enum Type : u32{
+typedef enum Type{
 	TYPE_INVALID,
+	TYPE__GprsBegin,
 	TYPE_R8,
 	TYPE_R16,
 	TYPE_R32,
 	TYPE_R64,
+	TYPE__GprsEnd,
 	TYPE__ImmsBegin,
 	TYPE_IMM8,
 	TYPE_IMM16,
@@ -300,9 +304,26 @@ typedef enum Type : u32{
 	TYPE__Count,
 }Type;
 
+
+bool type_is_imm(Type type)
+{
+	return type > TYPE__ImmsBegin && type < TYPE__ImmsEnd;
+}
+
+bool type_is_gpr(Type type)
+{
+	return type > TYPE__GprsBegin && type < TYPE__GprsEnd;
+}
+
+bool type_is_rm(Type type)
+{
+	return type > TYPE__RmsBegin && type < TYPE__RmsEnd;
+}
+
+
 // enum, textual rep, encoding, type
 #define REGISTERS \
-REG_DEF(REG_INVALID, "", 0xff, TYPE_INVALID) \
+REG_DEF(REG__Invaild, "", 0xff, TYPE_INVALID) \
 REG_DEF(REG_AL, "al", 0b000, TYPE_R8) \
 REG_DEF(REG_CL, "cl", 0b001, TYPE_R8) \
 REG_DEF(REG_DL, "dl", 0b010, TYPE_R8) \
@@ -419,7 +440,7 @@ RegisterKind register_kind_from_sv(SV str)
 		if (sv_cmp_cstr(str, register_strings[i]) == 0)
 			return (RegisterKind)i;
 	}
-	return REG_INVALID;
+	return REG__Invaild;
 }
 
 
@@ -433,6 +454,9 @@ RegisterKind register_kind_from_sv(SV str)
 #define INSTR_ARGS2(first, second) ((first) | (second << 8))
 #define INSTR_ARGS3(first, second, third) ((first) | (second << 8) | (third << 16))
 #define INSTR_ARGS4(first, second, third, fourth) INSTR_ARGS3(first, second, third) | (fourth << 24)
+
+#define INSTR_GET_ARGS(pt) Type args[4] = {0}; args[0] = pt & 0xff; args[1] = (pt >> 8) & 0xff;\
+args[2] = (pt >> 16) & 0xff; args[3] = pt >> 24;
 
 
 // these are extra opcode flags to be OR-ed
@@ -458,8 +482,8 @@ INSTR_DEF(INSTR_MOV_R16RM16, "mov", 0x8B, NO_EXTRA, 2, INSTR_ARGS2(TYPE_R16, TYP
 INSTR_DEF(INSTR_MOV_R32RM32, "mov", 0x8B, NO_EXTRA, 2, INSTR_ARGS2(TYPE_R32, TYPE_RM32)) \
 INSTR_DEF(INSTR_MOV_R64RM64, "mov", 0x8B, NO_EXTRA, 2, INSTR_ARGS2(TYPE_R64, TYPE_RM64)) \
 INSTR_DEF(INSTR_MOV_R8IMM8, "mov", 0xB0, REG_IN_OPCODE | HAS_IMM | IMM_8, 2, INSTR_ARGS2(TYPE_R8, TYPE_IMM8)) \
-INSTR_DEF(INSTR_MOV_R16IMM16, "mov", 0xB8, REG_IN_OPCODE | HAS_IMM | IMM_16, 2, INSTR_ARGS2(TYPE_R8, TYPE_IMM8)) \
-INSTR_DEF(INSTR_MOV_R32IMM32, "mov", 0xB8, REG_IN_OPCODE | HAS_IMM | IMM_32, 2, INSTR_ARGS2(TYPE_R8, TYPE_IMM8)) \
+INSTR_DEF(INSTR_MOV_R16IMM16, "mov", 0xB8, REG_IN_OPCODE | HAS_IMM | IMM_16, 2, INSTR_ARGS2(TYPE_R16, TYPE_IMM16)) \
+INSTR_DEF(INSTR_MOV_R32IMM32, "mov", 0xB8, REG_IN_OPCODE | HAS_IMM | IMM_32, 2, INSTR_ARGS2(TYPE_R32, TYPE_IMM32)) \
 INSTR_DEF(INSTR_MOV_RM64IMM32, "mov", 0xc7, HAS_IMM | IMM_32, 2, INSTR_ARGS2(TYPE_RM64, TYPE_IMM32)) \
 INSTR_DEF(INSTR_MOV_R64IMM64, "mov", 0xB8, REG_IN_OPCODE | HAS_IMM | IMM_64, 2, INSTR_ARGS2(TYPE_R8, TYPE_IMM8)) \
 INSTR_DEF(INTSR_MOV_RM8IMM8, "mov", 0xc6, HAS_IMM | IMM_8, 2, INSTR_ARGS2(TYPE_RM8, TYPE_IMM8)) \
@@ -517,6 +541,55 @@ InstructionKind instr_get_from_sv(SV sv)
 		{
 			return (InstructionKind)i;
 		}
+	}
+	return INSTR__Invalid;
+}
+
+
+InstructionKind instr_match_types(InstructionKind instr_group, i32 argc, Type types[4])
+{
+	for (i32 i = instr_group+1;i < (instr_argc[instr_group] + instr_group+1);++i)
+	{
+		if (instr_argc[i] != argc) continue;
+		INSTR_GET_ARGS(instr_args[i]);
+		bool match = true;
+		for (i32 j = 0;j < argc;++j)
+		{
+			if (type_is_imm(types[j]))
+			{
+				// a smaller imm can be promoted to a bigger one, but not the other way around
+				if (!(args[j] >= types[j] && args[j] < TYPE__ImmsEnd))
+				{
+					match = false;
+					break;
+				}
+			}
+			else if (type_is_gpr(types[j]))
+			{
+				if (type_is_gpr(args[j]))
+				{
+					if (args[j] != types[j])
+					{
+						match = false;
+						break;
+					}
+				}
+				else if (type_is_rm(args[j]))
+				{
+					if ((args[j] - TYPE__RmsBegin) != (types[j] - TYPE__GprsBegin))
+					{
+						match = false;
+						break;
+					}
+				}
+				else
+				{
+					match = false;
+					break;
+				}
+			}
+		}
+		if (match) return (InstructionKind)i;
 	}
 	return INSTR__Invalid;
 }
@@ -773,8 +846,10 @@ void parse_error(TranslationUnit* tu, const char* format, ...)
     vfprintf(stderr, format, args);
     va_end(args);
     fprintf(stderr, "\n");
+	// TODO: parse error sometimes skips more than it should
 	skip_until_newline(&tu->l);
 }
+
 
 int main(void)
 {
@@ -786,14 +861,12 @@ int main(void)
 	while (true)
 	{
 		tok = lexer_get(l);
-		token_print(l, tok);
 		if (tok == LEX_EOF) break;
 		if (tok == LEX_LINE_FEED)
 		{
 			// TODO: handling of labels
 repeat:
 			tok = lexer_get(l);
-			token_print(l, tok);
 			// all acceptable tokens after newline
 			switch (tok)
 			{
@@ -813,6 +886,44 @@ repeat:
 							break;
 						}
 						assert(instr_opcode[instr] == 0);
+
+						Type arg_type[4] = {0};
+						RegisterKind reg[4] = {0};
+						i32 imm[4] = {0};
+						int argc = 0;
+						for (;argc < 4;)
+						{
+							tok = lexer_get(l);
+							if (tok == LEX_COMMA) continue; // NOTE: now no commas are necessery for now
+							if (tok == LEX_LINE_FEED) break;
+							if (tok == LEX_EOF) goto end;
+							if (tok == LEX_INT_LIT)
+							{
+								arg_type[argc] = TYPE_IMM8;
+								imm[argc] = l->value;
+								argc += 1;
+							}
+							if (tok == LEX_IDENTIFIER)
+							{
+								RegisterKind curr = register_kind_from_sv(l->identifier);
+								if (curr == REG__Invaild) parse_error(&unit, "Wrong register: %.*s or something", SV_PRINT(l->identifier));
+								arg_type[argc] = register_types[curr];
+								reg[argc] = curr;
+								argc += 1;
+							}
+						}
+						printf("Instr |%s|: ", instr_text[instr]);
+						for (int i = 0;i < argc;++i)
+						{
+							if (arg_type[i] == TYPE_IMM8) printf("imm |%d|, ", imm[i]);
+							else printf("reg: %s, ", register_strings[reg[i]]);
+						}
+						printf("\n");
+						InstructionKind specific_instr = instr_match_types(instr, argc, arg_type);
+						// TODO: better message for type mismatch
+						if (specific_instr == INSTR__Invalid) parse_error(&unit, "Could not match the type of instruction");
+						else printf("%s: opcode %x\n", instr_text[specific_instr], instr_opcode[specific_instr]);
+						goto repeat;
 					}break;
 				case LEX_EOF:
 					{
@@ -827,7 +938,7 @@ repeat:
 		if (tok == LEX_IDENTIFIER)
 		{
 			RegisterKind reg = register_kind_from_sv(l->identifier);
-			if (reg != REG_INVALID)
+			if (reg != REG__Invaild)
 			{
 				// printf("Register: %s, encoding: %d\n", register_strings[reg], register_encodings[reg]);
 			}
