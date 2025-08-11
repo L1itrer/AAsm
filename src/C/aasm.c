@@ -792,6 +792,7 @@ const char token_chars[] = {
 typedef struct Lexer{
 	SV input_stream;
 	u32 current_line;
+  u32 current_column;
 	u32 line_character;
 	u32 byte_offset;
 	Token token;
@@ -842,6 +843,7 @@ static char get_character(Lexer* l)
 {
 	char c = l->input_stream.pointer[l->byte_offset];
 	l->byte_offset += 1;
+  l->current_column += 1;
 	return c;
 }
 
@@ -900,6 +902,7 @@ Token lexer_get(Lexer* l)
 		else if (c == '\n')
 		{
 			l->current_line += 1;
+      l->current_column = 0;
 			return LEX_LINE_FEED;
 		}
 
@@ -921,7 +924,7 @@ Token lexer_get(Lexer* l)
 				break;
 			}
 			if (is_space(c) || c == '\n') break;
-			l->byte_offset += 1;
+      get_character(l);
 		}
 		SV word = (SV){
 			.pointer = l->input_stream.pointer + curr_offset, 
@@ -995,7 +998,7 @@ bool tu_init(TranslationUnit* tu, const char* file_path, const char* output_path
 void parse_error(TranslationUnit* tu, const char* format, ...)
 {
 	tu->err_count += 1;
-	fprintf(stderr, "%s:%u error: ", tu->file_path, tu->l.current_line);
+	fprintf(stderr, "%s:%u:%u error: ", tu->file_path, tu->l.current_line, tu->l.current_column-1);
 	
     va_list args;
     va_start(args, format);
@@ -1046,8 +1049,8 @@ repeat:
 						Type arg_type[4] = {0};
 						RegisterKind reg[4] = {0};
 						i32 imm[4] = {0};
-						int argc = 0;
-						for (;argc < 4;)
+						int instr_argc = 0;
+						for (;instr_argc < 4;)
 						{
 							tok = lexer_get(l);
 							if (tok == LEX_COMMA) continue; // NOTE: now no commas are necessery for now
@@ -1055,9 +1058,9 @@ repeat:
 							if (tok == LEX_EOF) goto end;
 							if (tok == LEX_INT_LIT)
 							{
-								arg_type[argc] = TYPE_IMM8;
-								imm[argc] = l->value;
-								argc += 1;
+								arg_type[instr_argc] = TYPE_IMM8;
+								imm[instr_argc] = l->value;
+								instr_argc+= 1;
 							}
               if (tok == LEX_INT_LIT_INVALID)
               {
@@ -1068,12 +1071,12 @@ repeat:
 							{
 								RegisterKind curr = register_kind_from_sv(l->identifier);
 								if (curr == REG__Invaild) parse_error(&unit, "Wrong register: %.*s or something", SV_PRINT(l->identifier));
-								arg_type[argc] = register_types[curr];
-								reg[argc] = curr;
-								argc += 1;
+								arg_type[instr_argc] = register_types[curr];
+								reg[instr_argc] = curr;
+								instr_argc += 1;
 							}
 						}
-						InstructionKind specific_instr = instr_match_types(instr, argc, arg_type);
+						InstructionKind specific_instr = instr_match_types(instr, instr_argc, arg_type);
 						// TODO: better message for type mismatch
 						instr_assemble(&unit.code, specific_instr, arg_type, imm, reg);
 						goto repeat;
@@ -1117,6 +1120,7 @@ end:
 	if (executable_code == MAP_FAILED)
 	{
 		aasm_log(LOG_ERROR, "Could not map memory: %s\n", strerror(errno));
+    return 1;
 	}
 	memcpy(executable_code, unit.code.items, unit.code.count);
 	int res = executable_code("Hello world!\n");
