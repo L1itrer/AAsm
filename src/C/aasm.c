@@ -209,6 +209,11 @@ bool is_number(u8 c)
     return c >= '0' && c <= '9';
 }
 
+bool is_separator(u8 c)
+{
+  return c == ' ' || c == ',' || c == '\n' || c == '\t';
+}
+
 Bases bases_from_char(char c)
 {
     if (c == 'x') return BASE_HEX;
@@ -218,34 +223,38 @@ Bases bases_from_char(char c)
     return BASE_INVALID;
 }
 
-i32 sv_to_i32(SV slice, Bases base)
+bool sv_to_i64(SV slice, i64* value)
 {
-    i32 result = 0;
-    i32 multiply_by = (i32)base;
-//    u64 i = slice.pointer[0] != '-' ? 3 : 2; // load up the first digit index
-//    if (c == 'b' || c == 'B' && slice.pointer[i-1] == '0') multiply_by = 2;
-//    else if (c == 'o' || c == 'O' && slice.pointer[i-1] == '0') multiply_by = 8;
-//    else if (c == 'x' || c == 'X' && slice.pointer[i-1] == '0') multiply_by = 16;
-//    else if (c == 'd' || c == 'D' && slice.pointer[i-1] == '0') multiply_by = 10;
-//    else
-//    {
-//        multiply_by = 10;
-//        i = slice.pointer[0] != '-' ? 1 : 0;
-//    }
-
-    for (u64 i = 0; i < slice.length;i += 1)
+  i64 result = 0;
+  i64 multiply_by;
+    u8 c = slice.pointer[1];
+    u64 i = slice.pointer[0] == '-' ? 3 : 2; // load up the first digit index
+    if (is_number(slice.pointer[i-1]) || slice.length == 1)
+  {
+    multiply_by = 10;
+    i = slice.pointer[0] == '-' ? 1 : 0;
+  }
+  else if ((c == 'b' || c == 'B') && slice.pointer[0] == '0') multiply_by = 2;
+    else if ((c == 'o' || c == 'O') && slice.pointer[0] == '0') multiply_by = 8;
+    else if ((c == 'x' || c == 'X') && slice.pointer[0] == '0') multiply_by = 16;
+    else if ((c == 'd' || c == 'D') && slice.pointer[0] == '0') multiply_by = 10;
+    else
     {
-        u8 c = slice.pointer[i];\
+        return false;
+    }
+
+    for (; i < slice.length;i += 1)
+    {
+        u8 c = slice.pointer[i];
         if (c == '_') continue;
         if (!is_literal_character_valid(c, multiply_by))
         {
-            aasm_log(LOG_ERROR, "Invalid number literal conversion");
-            result = 0;
-            break;
+            return false;
         }
         CONVERT_ONE_CHAR(c, result, multiply_by);
     }
-    return result;
+  *value = result;
+  return true;
 }
 
 i32 sv_cmp(SV str1, SV str2)
@@ -750,10 +759,16 @@ TOKEN_DEF(LEX_LINE_FEED, "newline", "", ' ') \
 TOKEN_DEF(LEX_COMMENT, "comment", "", '#') \
 TOKEN_DEF(LEX_COMMA, ",", "", ',') \
 TOKEN_DEF(LEX_INT_LIT, "int", "", ' ' ) \
+TOKEN_DEF(LEX_INT_LIT_INVALID, "intinv", "", ' ') \
 TOKEN_DEF(LEX_LABELDEF, "label", "", ' ') \
 TOKEN_DEF(LEX_IDENTIFIER, "id", "", ' ') \
 TOKEN_DEF(LEX_REGISTER, "regster", "", ' ') \
 TOKEN_DEF(LEX_INSTRUCTION, "instruction", "", ' ') \
+TOKEN_DEF(LEX_PREFIX, "prefix", "", ' ') \
+TOKEN_DEF(LEX_BYTES_DECL, "db", "db", ' ') \
+TOKEN_DEF(LEX_WORDS_DECL, "dw", "dw", ' ') \
+TOKEN_DEF(LEX_DWORDS_DECL, "dd", "dd", ' ') \
+TOKEN_DEF(LEX_QWORDS_DECL, "dq", "dq", ' ') \
 
 typedef enum Token{
 	#define TOKEN_DEF(tok, prt, str,char) tok,
@@ -784,7 +799,7 @@ typedef struct Lexer{
 	RegisterKind reg;
 	InstructionKind instr;
 	SV identifier;
-	i64 value;
+	u64 value;
 
 	String* string_storage;
 }Lexer;
@@ -833,7 +848,7 @@ static char get_character(Lexer* l)
 static char peek_character(Lexer* l)
 {
 	if (l->byte_offset >= l->input_stream.length) return 0;
-	return l->input_stream.pointer[l->byte_offset+1];
+	return l->input_stream.pointer[l->byte_offset];
 }
 
 static bool is_space(char c)
@@ -900,12 +915,13 @@ Token lexer_get(Lexer* l)
 		{
 			c = peek_character(l);
 			if (c == 0) return LEX_EOF;
-			l->byte_offset += 1;
+      if (l->byte_offset >= l->input_stream.length) return LEX_EOF;
 			if (c == ',')
 			{
 				break;
 			}
 			if (is_space(c) || c == '\n') break;
+			l->byte_offset += 1;
 		}
 		SV word = (SV){
 			.pointer = l->input_stream.pointer + curr_offset, 
@@ -915,17 +931,14 @@ Token lexer_get(Lexer* l)
 		if (is_number(word.pointer[0]))
 		{
 			// TODO: introduce base from sv not from char
-			Bases base = bases_from_char(word.pointer[1]);
-			if (base == BASE_INVALID)
-			{
-				aasm_log(LOG_ERROR, "Invalid number base: %c at line %u", c, l->current_line);
-				return LEX_PARSE_ERROR;
-			}
-			// HACK: 
-			word.pointer += 2;
-			word.length -= 2;
-			i32 num = sv_to_i32(word, base);
-			u32 unum = *(u32*)&num;
+      i64 number;
+      bool ok = sv_to_i64(word, &number);
+      if (!ok)
+      {
+        return LEX_INT_LIT_INVALID;
+      }
+
+			u64 unum = *(u64*)&number;
 			l->value = unum;
 			return LEX_INT_LIT;
 		}
@@ -1046,6 +1059,11 @@ repeat:
 								imm[argc] = l->value;
 								argc += 1;
 							}
+              if (tok == LEX_INT_LIT_INVALID)
+              {
+                parse_error(&unit, "Invalid integer literal");
+                break;
+              }
 							if (tok == LEX_IDENTIFIER)
 							{
 								RegisterKind curr = register_kind_from_sv(l->identifier);
@@ -1093,13 +1111,15 @@ end:
 	printf("\n");
 
 
-	int (*executable_code)(const char*, unsigned long) = mmap(0, unit.code.count, PROT_EXEC | PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (unit.err_count > 0) return 1;
+
+	int (*executable_code)(const char*) = mmap(0, unit.code.count, PROT_EXEC | PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (executable_code == MAP_FAILED)
 	{
 		aasm_log(LOG_ERROR, "Could not map memory: %s\n", strerror(errno));
 	}
 	memcpy(executable_code, unit.code.items, unit.code.count);
-	int res = executable_code("Hello world!\n", 13);
+	int res = executable_code("Hello world!\n");
 	printf("res = %d\n", res);
 
 
