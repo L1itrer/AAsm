@@ -988,15 +988,26 @@ bool assemble_tu(TranslationUnit *tu) {
             reg[instr_argc] = curr;
             instr_argc += 1;
           }
+          if (tok == LEX_INSTRUCTION) {
+            parse_error(tu, "More then one instruction in a single line");
+          }
           if (tok == LEX_IDENTIFIER) {
             // TODO: for now indentifier means some kind of error
-            parse_error(tu, "Expected a register on an int literal, but got %.*s", SV_PRINT(l->identifier));
+            parse_error(tu,
+                        "Expected a register or an int literal, but got %.*s",
+                        SV_PRINT(l->identifier));
           }
         }
         InstructionKind specific_instr =
             instr_match_types(instr, instr_argc, arg_type);
         // TODO: better message for type mismatch
-        instr_assemble(&tu->code, specific_instr, arg_type, imm, reg);
+        if (specific_instr == INSTR__Invalid) {
+          parse_error(tu, "Type mismatch on instruction |%s|",
+                      instr_text[instr]);
+        }
+        if (tu->err_count == 0) {
+          instr_assemble(&tu->code, specific_instr, arg_type, imm, reg);
+        }
         goto repeat;
       } break;
       case LEX_EOF: {
