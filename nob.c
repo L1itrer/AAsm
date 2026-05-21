@@ -3,28 +3,20 @@
 #define NOB_STRIP_PREFIX
 #include "nob.h"
 
-
+#define OUTPUT_DIR "./out"
 
 
 int main(int argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF(argc, argv);
-    nob_mkdir_if_not_exists("./build");
+    nob_mkdir_if_not_exists(OUTPUT_DIR);
     Cmd cmd = {0};
-    Nob_File_Paths file_paths = {0};
 #ifdef WIN32
 	Nob_Procs procs = {0};
 	nob_cmd_append(&cmd, "cl", "-Wall", "-Zi", "-Fo:build\\", "-Fd:build\\", "-Fe:build\\aasm.exe", "-EHsc", "-D_CRT_SECURE_NO_WARNINGS", "src\\C\\aasm.c");
 #else
-    if (!nob_read_entire_dir("./src/C", &file_paths)) return 1;
-    nob_cmd_append(&cmd, "gcc", "-Wall", "-Wextra", "-o", "./build/aasm", "-ggdb", "./src/C/aasm.c");
-//    for (size_t i = 0;i < file_paths.count;++i)
-//    {
-//        const char* curr_file = file_paths.items[i];
-//        if (strcmp(".", curr_file) == 0 || strcmp("..", curr_file) == 0) continue;
-//        nob_cmd_append(&cmd, temp_sprintf("./src/C/%s", curr_file));
-//    }
+    cmd_append(&cmd, "gcc", "-Wall", "-Wextra", "-o", OUTPUT_DIR"/aasm", "-ggdb", "./src/C/aasm.c");
 #endif
-    if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
+    if (!cmd_run(&cmd)) return 1;
     return 0;
 }
