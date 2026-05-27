@@ -873,7 +873,7 @@ Token lexer_get(Lexer* l)
 			continue;
 		}
 		if (c == '#')
-		{	
+		{
 			skip_until_newline(l);
 			return LEX_COMMENT;
 		}
@@ -1001,86 +1001,68 @@ int main(void)
 	tu_init(&unit, "./test/hello.asm", "");
 	
 	Token tok = LEX_PARSE_ERROR;
-	while (true)
+    bool shouldKeepParsing = true;
+	while (shouldKeepParsing)
 	{
 		tok = lexer_get(l);
-		if (tok == LEX_EOF) break;
-		if (tok == LEX_LINE_FEED)
+		switch (tok)
 		{
-			// TODO: handling of labels
-repeat:
-			tok = lexer_get(l);
-			// all acceptable tokens after newline
-			switch (tok)
-			{
-				case LEX_LINE_FEED:
-					goto repeat;
+			case LEX_EOF:
+				{
+					shouldKeepParsing = false;
 					break;
-				case LEX_COMMENT:
+				}
+			case LEX_COMMENT:
+				{
+					aasm_log(LOG_INFO, "Comment");
+					break;
+				}
+			case LEX_LINE_FEED: break;
+			case LEX_IDENTIFIER: // HACK: identifier is not acceptable
+				{
+					// NOTE: this is currently more like "parse instruction"
+					InstructionKind instr = instr_get_from_sv(l->identifier);
+					if (instr == INSTR__Invalid)
 					{
-						
-					} break;
-				case LEX_IDENTIFIER: // HACK: identifier is not acceptable
-					{
-						InstructionKind instr = instr_get_from_sv(l->identifier);
-						if (instr == INSTR__Invalid)
-						{
-							parse_error(&unit, "Invalid identifier: |%.*s|", (int)l->identifier.length, l->identifier.pointer);
-							break;
-						}
-						assert(instr_opcode[instr] == 0);
+						parse_error(&unit, "Invalid identifier: |%.*s|", (int)l->identifier.length, l->identifier.pointer);
+						break;
+					}
+					assert(instr_opcode[instr] == 0);
 
-						Type arg_type[4] = {0};
-						RegisterKind reg[4] = {0};
-						i32 imm[4] = {0};
-						int argc = 0;
-						for (;argc < 4;)
-						{
-							tok = lexer_get(l);
-							if (tok == LEX_COMMA) continue; // NOTE: now no commas are necessery for now
-							if (tok == LEX_LINE_FEED) break;
-							if (tok == LEX_EOF) goto end;
-							if (tok == LEX_INT_LIT)
-							{
-								arg_type[argc] = TYPE_IMM8;
-								imm[argc] = l->value;
-								argc += 1;
-							}
-							if (tok == LEX_IDENTIFIER)
-							{
-								RegisterKind curr = register_kind_from_sv(l->identifier);
-								if (curr == REG__Invaild) parse_error(&unit, "Wrong register: %.*s or something", SV_PRINT(l->identifier));
-								arg_type[argc] = register_types[curr];
-								reg[argc] = curr;
-								argc += 1;
-							}
-						}
-						InstructionKind specific_instr = instr_match_types(instr, argc, arg_type);
-						// TODO: better message for type mismatch
-						instr_assemble(&unit.code, specific_instr, arg_type, imm, reg);
-						goto repeat;
-					}break;
-				case LEX_EOF:
+					Type arg_type[4] = {0};
+					RegisterKind reg[4] = {0};
+					i32 imm[4] = {0};
+					int argc = 0;
+					for (;argc < 4;)
 					{
-						goto end;
-					}break;
-				default:
+						tok = lexer_get(l);
+						if (tok == LEX_COMMA) continue; // NOTE: now no commas are necessery for now
+						if (tok == LEX_LINE_FEED) break;
+						if (tok == LEX_EOF) goto end;
+						if (tok == LEX_INT_LIT)
+						{
+							arg_type[argc] = TYPE_IMM8;
+							imm[argc] = l->value;
+							argc += 1;
+						}
+						if (tok == LEX_IDENTIFIER)
+						{
+							RegisterKind curr = register_kind_from_sv(l->identifier);
+							if (curr == REG__Invaild) parse_error(&unit, "Wrong register: %.*s or something", SV_PRINT(l->identifier));
+							arg_type[argc] = register_types[curr];
+							reg[argc] = curr;
+							argc += 1;
+						}
+					}
+					InstructionKind specific_instr = instr_match_types(instr, argc, arg_type);
+					// TODO: better message for type mismatch
+					instr_assemble(&unit.code, specific_instr, arg_type, imm, reg);
+					break;
+				}
+			default:
+				{
 					parse_error(&unit, "Unexpected token |%s| at the beginning of a line", token_printable[tok]);
-			}
-			continue;
-			// TODO: Special handling of prefixes
-		}
-		if (tok == LEX_IDENTIFIER)
-		{
-			RegisterKind reg = register_kind_from_sv(l->identifier);
-			if (reg != REG__Invaild)
-			{
-				// printf("Register: %s, encoding: %d\n", register_strings[reg], register_encodings[reg]);
-			}
-		}
-		if (tok == LEX_INT_LIT)
-		{
-			// printf("Int literal: %ld\n", l.value);
+				}
 		}
 	}
 end:
