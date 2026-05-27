@@ -5,18 +5,28 @@
 
 #define OUTPUT_DIR "./out"
 
+void cflags(Cmd* cmd)
+{
+    cmd_append(cmd, "-Wall", "-Wextra");
+    cmd_append(cmd, "-Werror=implicit-fallthrough");
+}
+
+void debug_flags(Cmd* cmd)
+{
+    cmd_append(cmd, "-g");
+}
 
 int main(int argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF(argc, argv);
     nob_mkdir_if_not_exists(OUTPUT_DIR);
-    Cmd cmd = {0};
-#ifdef WIN32
-	Nob_Procs procs = {0};
-	nob_cmd_append(&cmd, "cl", "-Wall", "-Zi", "-Fo:build\\", "-Fd:build\\", "-Fe:build\\aasm.exe", "-EHsc", "-D_CRT_SECURE_NO_WARNINGS", "src\\C\\aasm.c");
-#else
-    cmd_append(&cmd, "gcc", "-Wall", "-Wextra", "-o", OUTPUT_DIR"/aasm", "-ggdb", "./src/C/aasm.c");
-#endif
-    if (!cmd_run(&cmd)) return 1;
+    Cmd cmdStack = {0};
+    Cmd* cmd = &cmdStack;
+    cmd_append(cmd, "gcc");
+    cmd_append(cmd, "-o", temp_sprintf("%s/aasm", OUTPUT_DIR));
+    cflags(cmd);
+    debug_flags(cmd);
+    cmd_append(cmd, "./src/C/aasm.c");
+    if (!cmd_run(cmd)) return 1;
     return 0;
 }
