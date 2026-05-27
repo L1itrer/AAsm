@@ -237,17 +237,13 @@ i32 sv_to_i32(SV slice, Bases base)
 {
     i32 result = 0;
     i32 multiply_by = (i32)base;
+    assert((base == BASE_DEC) || (base == BASE_BIN) || (base == BASE_OCT) || (base == BASE_HEX));
 
     for (u64 i = 0; i < slice.len;i += 1)
     {
         u8 c = slice.ptr[i];
         if (c == '_') continue;
-        if (!is_literal_character_valid(c, multiply_by))
-        {
-            aasm_log(LOG_ERROR, "Invalid number literal conversion");
-            result = 0;
-            break;
-        }
+        assert(is_literal_character_valid(c, multiply_by));
         CONVERT_ONE_CHAR(c, result, multiply_by);
     }
     return result;
@@ -255,7 +251,7 @@ i32 sv_to_i32(SV slice, Bases base)
 
 i32 sv_cmp(SV str1, SV str2)
 {
-	// NOTE: some size considerations are necessery
+    // NOTE: some size considerations are necessery
     if (str1.len != str2.len) return (i32)((i32)str1.len - (i32)str2.len);
     for (u64 i = 0;i < str1.len;++i)
     {
@@ -268,14 +264,14 @@ i32 sv_cmp(SV str1, SV str2)
 
 i32 sv_cmp_cstr(SV a, const char* b)
 {
-	size_t blen = strlen(b);
-	if (a.len != blen) return (i32)((i32)a.len - (i32)blen);
-	for (u64 i = 0;i < a.len;++i)
-	{
-		if (a.ptr[i] != b[i])
-			return a.ptr[i] - b[i];
-	}
-	return 0;
+    size_t blen = strlen(b);
+    if (a.len != blen) return (i32)((i32)a.len - (i32)blen);
+    for (u64 i = 0;i < a.len;++i)
+    {
+        if (a.ptr[i] != b[i])
+            return a.ptr[i] - b[i];
+    }
+    return 0;
 }
 
 
@@ -286,44 +282,44 @@ i32 sv_cmp_cstr(SV a, const char* b)
 // -------------------------------------------------------------
 // TODO: segment registers
 typedef enum Type{
-	TYPE_INVALID,
-	TYPE__GprsBegin,
-	TYPE_R8,
-	TYPE_R16,
-	TYPE_R32,
-	TYPE_R64,
-	TYPE__GprsEnd,
-	TYPE__ImmsBegin,
-	TYPE_IMM8,
-	TYPE_IMM16,
-	TYPE_IMM32,
-	TYPE_IMM64,
-	TYPE__ImmsEnd,
-	TYPE_YMM,
-	TYPE_XMM,
-	TYPE__RmsBegin,
-	TYPE_RM8,
-	TYPE_RM16,
-	TYPE_RM32,
-	TYPE_RM64,
-	TYPE__RmsEnd,
-	TYPE__Count,
+    TYPE_INVALID,
+    TYPE__GprsBegin,
+    TYPE_R8,
+    TYPE_R16,
+    TYPE_R32,
+    TYPE_R64,
+    TYPE__GprsEnd,
+    TYPE__ImmsBegin,
+    TYPE_IMM8,
+    TYPE_IMM16,
+    TYPE_IMM32,
+    TYPE_IMM64,
+    TYPE__ImmsEnd,
+    TYPE_YMM,
+    TYPE_XMM,
+    TYPE__RmsBegin,
+    TYPE_RM8,
+    TYPE_RM16,
+    TYPE_RM32,
+    TYPE_RM64,
+    TYPE__RmsEnd,
+    TYPE__Count,
 }Type;
 
 
 bool type_is_imm(Type type)
 {
-	return type > TYPE__ImmsBegin && type < TYPE__ImmsEnd;
+    return type > TYPE__ImmsBegin && type < TYPE__ImmsEnd;
 }
 
 bool type_is_gpr(Type type)
 {
-	return type > TYPE__GprsBegin && type < TYPE__GprsEnd;
+    return type > TYPE__GprsBegin && type < TYPE__GprsEnd;
 }
 
 bool type_is_rm(Type type)
 {
-	return type > TYPE__RmsBegin && type < TYPE__RmsEnd;
+    return type > TYPE__RmsBegin && type < TYPE__RmsEnd;
 }
 
 
@@ -415,38 +411,38 @@ REG_DEF(REG__Count, "", 0xff, TYPE_INVALID) \
 
 
 typedef enum RegisterKind {
-	#define REG_DEF(kind, text, encode, type) kind,
-	REGISTERS
-	#undef REG_DEF
+    #define REG_DEF(kind, text, encode, type) kind,
+    REGISTERS
+    #undef REG_DEF
 }RegisterKind;
 
 
 const char* register_strings[] = {
-	#define REG_DEF(kind, text, encode, type) text,
-	REGISTERS
-	#undef REG_DEF
+    #define REG_DEF(kind, text, encode, type) text,
+    REGISTERS
+    #undef REG_DEF
 };
 
 const u8 register_encodings[] = {
-	#define REG_DEF(kind, text, encode, type) encode,
-	REGISTERS
-	#undef REG_DEF
+    #define REG_DEF(kind, text, encode, type) encode,
+    REGISTERS
+    #undef REG_DEF
 };
 
 const Type register_types[] = {
-	#define REG_DEF(kind, text, encode, type) type,
-	REGISTERS
-	#undef REG_DEF
+    #define REG_DEF(kind, text, encode, type) type,
+    REGISTERS
+    #undef REG_DEF
 };
 
 RegisterKind register_kind_from_sv(SV str)
 {
-	for (i32 i = 0;i < REG__Count;++i)
-	{
-		if (sv_cmp_cstr(str, register_strings[i]) == 0)
-			return (RegisterKind)i;
-	}
-	return REG__Invaild;
+    for (i32 i = 0;i < REG__Count;++i)
+    {
+        if (sv_cmp_cstr(str, register_strings[i]) == 0)
+            return (RegisterKind)i;
+    }
+    return REG__Invaild;
 }
 
 // -------------------------------------------------------------------
@@ -500,101 +496,101 @@ INSTR_DEF(INSTR_SYSCALL, "syscall", 0x0f05, NO_EXTRA, 0, 0) \
 INSTR_DEF(INSTR__Count, "", 0, 0, 0, 0) \
 
 typedef enum InstructionKind {
-	#define INSTR_DEF(kind, t, o, ox, argc, args) kind,
-	INSTRUCTIONS
-	#undef INSTR_DEF
+    #define INSTR_DEF(kind, t, o, ox, argc, args) kind,
+    INSTRUCTIONS
+    #undef INSTR_DEF
 }InstructionKind;
 
 const char* instr_text[] = {
-	#define INSTR_DEF(k, text, o, ox, argc, args) text, 
-	INSTRUCTIONS
-	#undef INSTR_DEF
+    #define INSTR_DEF(k, text, o, ox, argc, args) text, 
+    INSTRUCTIONS
+    #undef INSTR_DEF
 };
 
 const u32 instr_opcode[] = {
-	#define INSTR_DEF(k, t, opcode, ox, argc, args) opcode, 
-	INSTRUCTIONS
-	#undef INSTR_DEF
+    #define INSTR_DEF(k, t, opcode, ox, argc, args) opcode, 
+    INSTRUCTIONS
+    #undef INSTR_DEF
 };
 
 const u32 instr_opcextra[] = {
-	#define INSTR_DEF(k, t, o, opcode_extra, argc, args) opcode_extra,
-	INSTRUCTIONS
-	#undef INSTR_DEF
+    #define INSTR_DEF(k, t, o, opcode_extra, argc, args) opcode_extra,
+    INSTRUCTIONS
+    #undef INSTR_DEF
 };
 
 const i32 instr_argc[] = {
-	#define INSTR_DEF(k, t, o, ox, argc, args) argc,
-	INSTRUCTIONS
-	#undef INSTR_DEF 
+    #define INSTR_DEF(k, t, o, ox, argc, args) argc,
+    INSTRUCTIONS
+    #undef INSTR_DEF 
 };
 
 const u32 instr_args[] = {
-	#define INSTR_DEF(k, t, o, ox, argc, args) args,
-	INSTRUCTIONS
-	#undef INSTR_DEF
+    #define INSTR_DEF(k, t, o, ox, argc, args) args,
+    INSTRUCTIONS
+    #undef INSTR_DEF
 };
 
 
 InstructionKind instr_get_from_sv(SV sv)
 {
-	for (i32 i = 1;i < INSTR__Count;i += 1)
-	{
-		if (sv_cmp_cstr(sv, instr_text[i]) == 0)
-		{
-			return (InstructionKind)i;
-		}
-	}
-	return INSTR__Invalid;
+    for (i32 i = 1;i < INSTR__Count;i += 1)
+    {
+        if (sv_cmp_cstr(sv, instr_text[i]) == 0)
+        {
+            return (InstructionKind)i;
+        }
+    }
+    return INSTR__Invalid;
 }
 
 
 InstructionKind instr_match_types(InstructionKind instr_group, i32 argc, Type types[4])
 {
-	for (u32 i = instr_group+1;i < (instr_argc[instr_group] + instr_group+1);++i)
-	{
-		if (instr_argc[i] != argc) continue;
-		INSTR_GET_ARGS(instr_args[i]);
-		bool match = true;
-		for (i32 j = 0;j < argc;++j)
-		{
-			if (type_is_imm(types[j]))
-			{
-				// a smaller imm can be promoted to a bigger one, but not the other way around
-				if (!(args[j] >= types[j] && args[j] < TYPE__ImmsEnd))
-				{
-					match = false;
-					break;
-				}
-			}
-			else if (type_is_gpr(types[j]))
-			{
-				if (type_is_gpr(args[j]))
-				{
-					if (args[j] != types[j])
-					{
-						match = false;
-						break;
-					}
-				}
-				else if (type_is_rm(args[j]))
-				{
-					if ((args[j] - TYPE__RmsBegin) != (types[j] - TYPE__GprsBegin))
-					{
-						match = false;
-						break;
-					}
-				}
-				else
-				{
-					match = false;
-					break;
-				}
-			}
-		}
-		if (match) return (InstructionKind)i;
-	}
-	return INSTR__Invalid;
+    for (u32 i = instr_group+1;i < (instr_argc[instr_group] + instr_group+1);++i)
+    {
+        if (instr_argc[i] != argc) continue;
+        INSTR_GET_ARGS(instr_args[i]);
+        bool match = true;
+        for (i32 j = 0;j < argc;++j)
+        {
+            if (type_is_imm(types[j]))
+            {
+                // a smaller imm can be promoted to a bigger one, but not the other way around
+                if (!(args[j] >= types[j] && args[j] < TYPE__ImmsEnd))
+                {
+                    match = false;
+                    break;
+                }
+            }
+            else if (type_is_gpr(types[j]))
+            {
+                if (type_is_gpr(args[j]))
+                {
+                    if (args[j] != types[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                else if (type_is_rm(args[j]))
+                {
+                    if ((args[j] - TYPE__RmsBegin) != (types[j] - TYPE__GprsBegin))
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                else
+                {
+                    match = false;
+                    break;
+                }
+            }
+        }
+        if (match) return (InstructionKind)i;
+    }
+    return INSTR__Invalid;
 }
 #define REX_DEFAULT 0x40
 #define REX_W 0b00001000
@@ -620,124 +616,124 @@ int ipow(int base, int exp)
 
 static void write_imm(String* code, i64 imm, i32 byte_count)
 {
-	for (i32 i = 0;i < byte_count;++i)
-	{
-		aasm_append(code, (u8)(imm & 0xff));
-		imm >>= 8;
-	}
-	  //	u8 bytes[24] = {0};
-//	i32 count = 0;
-//	while (imm != 0)
-//	{
-//		bytes[count] = (imm & 0xff);
-//		imm >>= 8;
-//		count += 1;
-//	}
-//	for (int i = 0;i < byte_count;++i)
-//	{
-//		aasm_append(code, bytes[count-i-1]);
-//	}
+    for (i32 i = 0;i < byte_count;++i)
+    {
+        aasm_append(code, (u8)(imm & 0xff));
+        imm >>= 8;
+    }
+      //    u8 bytes[24] = {0};
+//    i32 count = 0;
+//    while (imm != 0)
+//    {
+//        bytes[count] = (imm & 0xff);
+//        imm >>= 8;
+//        count += 1;
+//    }
+//    for (int i = 0;i < byte_count;++i)
+//    {
+//        aasm_append(code, bytes[count-i-1]);
+//    }
 }
 
 static void write_opcode(String* code, u32 opcode)
 {
-	u8 bytes[8] = {0};
-	i32 count = 0;
-	while (opcode != 0)
-	{
-		bytes[count] = (opcode & 0xff);
-		opcode >>= 8;
-		count += 1;
-	}
-	for (i32 i = count-1;i >= 0;--i)
-	{
-		aasm_append(code, bytes[i]);
-	}
+    u8 bytes[8] = {0};
+    i32 count = 0;
+    while (opcode != 0)
+    {
+        bytes[count] = (opcode & 0xff);
+        opcode >>= 8;
+        count += 1;
+    }
+    for (i32 i = count-1;i >= 0;--i)
+    {
+        aasm_append(code, bytes[i]);
+    }
 }
 
 bool instr_assemble(String* code, InstructionKind instruction, Type given_args[4], i32 imms[4], RegisterKind regs[4])
 {
-	INSTR_GET_ARGS(instr_args[instruction]);
-	i32 argc = instr_argc[instruction];
-	u8 rex_prefix = REX_DEFAULT;
-	bool bit16_prefix = false;
-	u32 opcode = instr_opcode[instruction];
-	i64 imm = 0;
-	// TODO: add other modes to mod_rm, there is no handling of memory operands so far so it's
-	// impossible to infer them, for now it's hardcoded as a direct register-register addressing
-	// u8 sib = 0;
-	u8 mod_rm = 0b11000000;
-	bool write_modrm = false;
-	for (i32 i = 0;i < argc;++i)
-	{
-		switch (args[i])
-		{
-		case TYPE_IMM8:
-		case TYPE_IMM16:
-		case TYPE_IMM32:
-		case TYPE_IMM64:
-			imm = imms[i];
-			break;
-		case TYPE_RM64:
-			rex_prefix |= REX_W;
-			if (regs[i] > REG__RequiresREXR) rex_prefix |= REX_B;
-			goto type_rm32;
-		case TYPE_RM16:
-			bit16_prefix = true;
-			[[fallthrough]];
-		case TYPE_RM8:
-		case TYPE_RM32:
-			type_rm32:
-			{
-				if (type_is_gpr(given_args[i]))
-				{
-					u8 reg_code = register_encodings[regs[i]];
-					mod_rm |= reg_code;
-				}
-				else assert(false && "memory not yet implemented");
-				write_modrm = true;
-			}
-			break;
-		case TYPE_R64:
-			rex_prefix |= REX_W;
-			if (regs[i] > REG__RequiresREXR) rex_prefix |= REX_R;
-			goto type_r32;
-		case TYPE_R16:
-			bit16_prefix = true;
-			[[fallthrough]];
-		case TYPE_R8:
-		case TYPE_R32:
-			type_r32:
-			{
-				u8 reg_code = register_encodings[regs[i]];
-				if (instr_opcextra[instruction] & REG_IN_OPCODE)
-				{
-					opcode |= reg_code;
-					break;
-				}
-				mod_rm |= (reg_code << 3);
-				write_modrm = true;
-			}
-			break;
-		default:
-			assert(false && "not yet implemented type");
-		}
-	}
-	if (bit16_prefix && (rex_prefix != REX_DEFAULT))
-	{
-		assert(false && "Somehow the instruction is both 16 bit and 64 bit");
-	}
-	if (bit16_prefix) aasm_append(code, 0x66);
-	if (rex_prefix != REX_DEFAULT) aasm_append(code, rex_prefix);
-	write_opcode(code, opcode);
-	if (write_modrm) aasm_append(code, mod_rm);
-	// TODO:: here be sib
-	// TODO:: here be disp
-	if (instr_opcextra[instruction] & HAS_IMM)
-	{
-		write_imm(code, imm, ipow(2, (instr_opcextra[instruction] & 0x03)));
-	}
-	return true;
+    INSTR_GET_ARGS(instr_args[instruction]);
+    i32 argc = instr_argc[instruction];
+    u8 rex_prefix = REX_DEFAULT;
+    bool bit16_prefix = false;
+    u32 opcode = instr_opcode[instruction];
+    i64 imm = 0;
+    // TODO: add other modes to mod_rm, there is no handling of memory operands so far so it's
+    // impossible to infer them, for now it's hardcoded as a direct register-register addressing
+    // u8 sib = 0;
+    u8 mod_rm = 0b11000000;
+    bool write_modrm = false;
+    for (i32 i = 0;i < argc;++i)
+    {
+        switch (args[i])
+        {
+        case TYPE_IMM8:
+        case TYPE_IMM16:
+        case TYPE_IMM32:
+        case TYPE_IMM64:
+            imm = imms[i];
+            break;
+        case TYPE_RM64:
+            rex_prefix |= REX_W;
+            if (regs[i] > REG__RequiresREXR) rex_prefix |= REX_B;
+            goto type_rm32;
+        case TYPE_RM16:
+            bit16_prefix = true;
+            [[fallthrough]];
+        case TYPE_RM8:
+        case TYPE_RM32:
+            type_rm32:
+            {
+                if (type_is_gpr(given_args[i]))
+                {
+                    u8 reg_code = register_encodings[regs[i]];
+                    mod_rm |= reg_code;
+                }
+                else assert(false && "memory not yet implemented");
+                write_modrm = true;
+            }
+            break;
+        case TYPE_R64:
+            rex_prefix |= REX_W;
+            if (regs[i] > REG__RequiresREXR) rex_prefix |= REX_R;
+            goto type_r32;
+        case TYPE_R16:
+            bit16_prefix = true;
+            [[fallthrough]];
+        case TYPE_R8:
+        case TYPE_R32:
+            type_r32:
+            {
+                u8 reg_code = register_encodings[regs[i]];
+                if (instr_opcextra[instruction] & REG_IN_OPCODE)
+                {
+                    opcode |= reg_code;
+                    break;
+                }
+                mod_rm |= (reg_code << 3);
+                write_modrm = true;
+            }
+            break;
+        default:
+            assert(false && "not yet implemented type");
+        }
+    }
+    if (bit16_prefix && (rex_prefix != REX_DEFAULT))
+    {
+        assert(false && "Somehow the instruction is both 16 bit and 64 bit");
+    }
+    if (bit16_prefix) aasm_append(code, 0x66);
+    if (rex_prefix != REX_DEFAULT) aasm_append(code, rex_prefix);
+    write_opcode(code, opcode);
+    if (write_modrm) aasm_append(code, mod_rm);
+    // TODO:: here be sib
+    // TODO:: here be disp
+    if (instr_opcextra[instruction] & HAS_IMM)
+    {
+        write_imm(code, imm, ipow(2, (instr_opcextra[instruction] & 0x03)));
+    }
+    return true;
 }
 
 // ---------------------------------------------------------
@@ -758,345 +754,345 @@ TOKEN_DEF(LEX_REGISTER, "regster", "", ' ') \
 TOKEN_DEF(LEX_INSTRUCTION, "instruction", "", ' ') \
 
 typedef enum Token{
-	#define TOKEN_DEF(tok, prt, str,char) tok,
-	TOKENS
-	#undef TOKEN_DEF
+    #define TOKEN_DEF(tok, prt, str,char) tok,
+    TOKENS
+    #undef TOKEN_DEF
 }Token;
 
 const char* token_printable[] = {
-	#define TOKEN_DEF(tok, print, str, char) print,
-	TOKENS
-	#undef TOKEN_DEF
+    #define TOKEN_DEF(tok, print, str, char) print,
+    TOKENS
+    #undef TOKEN_DEF
 };
 
 const char token_chars[] = {
-	#define TOKEN_DEF(t, prt, s, char) char,
-	TOKENS
-	#undef TOKEN_DEF
+    #define TOKEN_DEF(t, prt, s, char) char,
+    TOKENS
+    #undef TOKEN_DEF
 };
 
 
 typedef struct Lexer{
-	SV input_stream;
-	u32 current_line;
-	u32 line_character;
-	u32 byte_offset;
-	Token token;
+    SV input_stream;
+    u32 current_line;
+    u32 line_character;
+    u32 byte_offset;
+    Token token;
 
-	RegisterKind reg;
-	InstructionKind instr;
-	SV identifier;
-	i64 value;
+    RegisterKind reg;
+    InstructionKind instr;
+    SV identifier;
+    i64 value;
 
-	String* string_storage;
+    String* string_storage;
 }Lexer;
 
 void token_print(Lexer* l, Token tok)
 {
-	printf("Token: |%s|", token_printable[tok]);
-	if (token_chars[tok] != ' ')
-	{
-		printf(", %c", token_chars[tok]);
-	}
-	if (tok == LEX_REGISTER)
-	{
-		printf(", |%s|", register_strings[l->reg]);
-	}
-	else if (tok == LEX_INSTRUCTION)
-	{
-		printf(", |%s|", instr_text[l->instr]);
-	}
-	else if (tok == LEX_IDENTIFIER)
-	{
-		printf(", |%.*s|", (int)l->identifier.len, l->identifier.ptr);
-	}
-	else if (tok == LEX_INT_LIT)
-	{
-		printf(", |%ld|", l->value);
-	}
-	printf("\n");
+    printf("Token: |%s|", token_printable[tok]);
+    if (token_chars[tok] != ' ')
+    {
+        printf(", %c", token_chars[tok]);
+    }
+    if (tok == LEX_REGISTER)
+    {
+        printf(", |%s|", register_strings[l->reg]);
+    }
+    else if (tok == LEX_INSTRUCTION)
+    {
+        printf(", |%s|", instr_text[l->instr]);
+    }
+    else if (tok == LEX_IDENTIFIER)
+    {
+        printf(", |%.*s|", (int)l->identifier.len, l->identifier.ptr);
+    }
+    else if (tok == LEX_INT_LIT)
+    {
+        printf(", |%ld|", l->value);
+    }
+    printf("\n");
 }
 
 void lexer_init(Lexer *l, SV input_stream, String* storage)
 {
-	*l = (Lexer){
-		.input_stream = input_stream,
-		.string_storage = storage,
-	};
+    *l = (Lexer){
+        .input_stream = input_stream,
+        .string_storage = storage,
+    };
 }
 
 static char get_character(Lexer* l)
 {
-	char c = l->input_stream.ptr[l->byte_offset];
-	l->byte_offset += 1;
-	return c;
+    char c = l->input_stream.ptr[l->byte_offset];
+    l->byte_offset += 1;
+    return c;
 }
 
 static char peek_character(Lexer* l)
 {
-	if (l->byte_offset >= l->input_stream.len) return 0;
-	return l->input_stream.ptr[l->byte_offset];
+    if (l->byte_offset >= l->input_stream.len) return 0;
+    return l->input_stream.ptr[l->byte_offset];
 }
 
 static bool is_space(char c)
 {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r'  || c == '\f';
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r'  || c == '\f';
 }
 // static void skip_whitespace(Lexer* l)
 // {
-// 	char c = 0;
-// 	do
-// 	{
-// 		l->byte_offset += 1;
-// 		c = l->input_stream.ptr[l->byte_offset];
-// 	} while (is_space(c) && l->byte_offset < l->input_stream.len);
-// 	l->byte_offset -= 1; // go back newline is a token
+//     char c = 0;
+//     do
+//     {
+//         l->byte_offset += 1;
+//         c = l->input_stream.ptr[l->byte_offset];
+//     } while (is_space(c) && l->byte_offset < l->input_stream.len);
+//     l->byte_offset -= 1; // go back newline is a token
 // }
 
 static void skip_until_newline(Lexer* l)
 {
-	char c = 0;
-	do
-	{
-		l->byte_offset += 1;
-		c = l->input_stream.ptr[l->byte_offset];
-	} while (c != '\n' && l->byte_offset < l->input_stream.len);
+    char c = 0;
+    do
+    {
+        l->byte_offset += 1;
+        c = l->input_stream.ptr[l->byte_offset];
+    } while (c != '\n' && l->byte_offset < l->input_stream.len);
 }
 
 Token lexer_get(Lexer* l)
 {
-	// u64 flen = l->input_stream.len;
-	for (;l->byte_offset < l->input_stream.len;)
-	{
-		u32 curr_offset = l->byte_offset;
-		char c = get_character(l);
-		if (is_space(c) && c != '\n')
-		{
-			continue;
-		}
-		if (c == '#')
-		{
-			skip_until_newline(l);
-			return LEX_COMMENT;
-		}
-		else if (c == ',')
-		{
-			return LEX_COMMA;
-			// TODO: commas
-		}
-		else if (c == '\n')
-		{
-			l->current_line += 1;
-			return LEX_LINE_FEED;
-		}
+    // u64 flen = l->input_stream.len;
+    for (;l->byte_offset < l->input_stream.len;)
+    {
+        u32 curr_offset = l->byte_offset;
+        char c = get_character(l);
+        if (is_space(c) && c != '\n')
+        {
+            continue;
+        }
+        if (c == '#')
+        {
+            skip_until_newline(l);
+            return LEX_COMMENT;
+        }
+        else if (c == ',')
+        {
+            return LEX_COMMA;
+            // TODO: commas
+        }
+        else if (c == '\n')
+        {
+            l->current_line += 1;
+            return LEX_LINE_FEED;
+        }
 
-//		while (!is_space(c))
-//		{
-//			if (l->byte_offset >= flen)
-//			{
-//				return LEX_EOF;
-//			}
-//			c = get_character(l);
-//		}
-		while (true) 
-		{
-			c = peek_character(l);
-			if (c == 0) return LEX_EOF;
-			if (c == ',')
-			{
-				break;
-			}
-			if (is_space(c) || c == '\n') break;
-			get_character(l);
-		}
-		SV word = (SV){
-			.ptr = l->input_stream.ptr + curr_offset, 
-			.len = l->byte_offset - curr_offset,
-		};
-		l->identifier = word;
-		if (is_number(word.ptr[0]))
-		{
-			// TODO: introduce base from sv not from char
-			Bases base = BASE_INVALID;
-			//printf("word: %.*s, len %zu\n", SV_PRINT(word), word.len);
-			if (word.len > 1)
-			{
-				base = bases_from_char(word.ptr[1]);
-				if (base == BASE_INVALID)
-				{
-					aasm_log(LOG_ERROR, "Invalid number base: %c at line %u", c, l->current_line);
-					return LEX_PARSE_ERROR;
-				}
-				// HACK: 
-				word.ptr += 2;
-				word.len -= 2;
-			}
-			else
-			{
-				base = BASE_DEC;
-			}
-			i32 num = sv_to_i32(word, base);
-			u32 unum = *(u32*)&num;
-			l->value = unum;
-			return LEX_INT_LIT;
-		}
-		else if (word.ptr[word.len-1] == ':')
-		{
-			// TODO: storing the labels
-			return LEX_LABELDEF;
-		}
-		else
-		{
-			return LEX_IDENTIFIER;
-		}
-	}
-	return LEX_EOF;
+//        while (!is_space(c))
+//        {
+//            if (l->byte_offset >= flen)
+//            {
+//                return LEX_EOF;
+//            }
+//            c = get_character(l);
+//        }
+        while (true) 
+        {
+            c = peek_character(l);
+            if (c == 0) return LEX_EOF;
+            if (c == ',')
+            {
+                break;
+            }
+            if (is_space(c) || c == '\n') break;
+            get_character(l);
+        }
+        SV word = (SV){
+            .ptr = l->input_stream.ptr + curr_offset, 
+            .len = l->byte_offset - curr_offset,
+        };
+        l->identifier = word;
+        if (is_number(word.ptr[0]))
+        {
+            // TODO: introduce base from sv not from char
+            Bases base = BASE_INVALID;
+            //printf("word: %.*s, len %zu\n", SV_PRINT(word), word.len);
+            if (word.len > 1)
+            {
+                base = bases_from_char(word.ptr[1]);
+                if (base == BASE_INVALID)
+                {
+                    aasm_log(LOG_ERROR, "Invalid number base: %c at line %u", c, l->current_line);
+                    return LEX_PARSE_ERROR;
+                }
+                // HACK: 
+                word.ptr += 2;
+                word.len -= 2;
+            }
+            else
+            {
+                base = BASE_DEC;
+            }
+            i32 num = sv_to_i32(word, base);
+            u32 unum = *(u32*)&num;
+            l->value = unum;
+            return LEX_INT_LIT;
+        }
+        else if (word.ptr[word.len-1] == ':')
+        {
+            // TODO: storing the labels
+            return LEX_LABELDEF;
+        }
+        else
+        {
+            return LEX_IDENTIFIER;
+        }
+    }
+    return LEX_EOF;
 }
 
 Token lexer_get_and_expect(Lexer *l, Token expected)
 {
-	Token tok = lexer_get(l);
-	if (tok != expected)
-	{
-		aasm_log(LOG_ERROR, "Unexpected token %d at line %d\n", tok, l->current_line);
-		return LEX_PARSE_ERROR;
-	}
-	return tok;
+    Token tok = lexer_get(l);
+    if (tok != expected)
+    {
+        aasm_log(LOG_ERROR, "Unexpected token %d at line %d\n", tok, l->current_line);
+        return LEX_PARSE_ERROR;
+    }
+    return tok;
 }
 
 typedef struct TranslationUnit{
-	i32 err_count, warn_count;
-	const char* file_path;
-	const char* output_path;
-	Lexer l;
-	String file_content;
-	String str_storage;
-	String code;
+    i32 err_count, warn_count;
+    const char* file_path;
+    const char* output_path;
+    Lexer l;
+    String file_content;
+    String str_storage;
+    String code;
 }TranslationUnit;
 
 
 bool tu_init(TranslationUnit* tu, const char* file_path, const char* output_path)
 {
-	tu->file_path = file_path;
-	tu->output_path = output_path;
-	if (!string_read_file(file_path, &tu->file_content)) return 1;
-	SV file_sv = (SV){
-		.ptr = tu->file_content.items, 
-		.len = tu->file_content.count
-	};
+    tu->file_path = file_path;
+    tu->output_path = output_path;
+    if (!string_read_file(file_path, &tu->file_content)) return 1;
+    SV file_sv = (SV){
+        .ptr = tu->file_content.items, 
+        .len = tu->file_content.count
+    };
 
-	lexer_init(&tu->l, file_sv, &tu->str_storage);
-	
-	return true;
+    lexer_init(&tu->l, file_sv, &tu->str_storage);
+    
+    return true;
 }
 
 void parse_error(TranslationUnit* tu, const char* format, ...)
 {
-	tu->err_count += 1;
-	fprintf(stderr, "%s:%u error: ", tu->file_path, tu->l.current_line);
-	
+    tu->err_count += 1;
+    fprintf(stderr, "%s:%u error: ", tu->file_path, tu->l.current_line);
+    
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
     fprintf(stderr, "\n");
-	// TODO: parse error sometimes skips more than it should
-	skip_until_newline(&tu->l);
+    // TODO: parse error sometimes skips more than it should
+    skip_until_newline(&tu->l);
 }
 
 
 int main(void)
 {
-	TranslationUnit unit = {0};
-	Lexer* l = &unit.l;
-	tu_init(&unit, "./test/hello.asm", "");
-	
-	Token tok = LEX_PARSE_ERROR;
+    TranslationUnit unit = {0};
+    Lexer* l = &unit.l;
+    tu_init(&unit, "./test/hello.asm", "");
+    
+    Token tok = LEX_PARSE_ERROR;
     bool shouldKeepParsing = true;
-	while (shouldKeepParsing)
-	{
-		tok = lexer_get(l);
-		switch (tok)
-		{
-			case LEX_EOF:
-				{
-					shouldKeepParsing = false;
-					break;
-				}
-			case LEX_COMMENT:
-				{
-					aasm_log(LOG_INFO, "Comment");
-					break;
-				}
-			case LEX_LINE_FEED: break;
-			case LEX_IDENTIFIER: // HACK: identifier is not acceptable
-				{
-					// NOTE: this is currently more like "parse instruction"
-					InstructionKind instr = instr_get_from_sv(l->identifier);
-					if (instr == INSTR__Invalid)
-					{
-						parse_error(&unit, "Invalid identifier: |%.*s|", (int)l->identifier.len, l->identifier.ptr);
-						break;
-					}
-					assert(instr_opcode[instr] == 0);
+    while (shouldKeepParsing)
+    {
+        tok = lexer_get(l);
+        switch (tok)
+        {
+            case LEX_EOF:
+                {
+                    shouldKeepParsing = false;
+                    break;
+                }
+            case LEX_COMMENT:
+                {
+                    aasm_log(LOG_INFO, "Comment");
+                    break;
+                }
+            case LEX_LINE_FEED: break;
+            case LEX_IDENTIFIER: // HACK: identifier is not acceptable
+                {
+                    // NOTE: this is currently more like "parse instruction"
+                    InstructionKind instr = instr_get_from_sv(l->identifier);
+                    if (instr == INSTR__Invalid)
+                    {
+                        parse_error(&unit, "Invalid identifier: |%.*s|", (int)l->identifier.len, l->identifier.ptr);
+                        break;
+                    }
+                    assert(instr_opcode[instr] == 0);
 
-					Type arg_type[4] = {0};
-					RegisterKind reg[4] = {0};
-					i32 imm[4] = {0};
-					int argc = 0;
-					for (;argc < 4;)
-					{
-						tok = lexer_get(l);
-						if (tok == LEX_COMMA) continue; // NOTE: now no commas are necessery for now
-						if (tok == LEX_LINE_FEED) break;
-						if (tok == LEX_EOF)
-						{
-							shouldKeepParsing = false;
-							break;
-						}
-						if (tok == LEX_INT_LIT)
-						{
-							arg_type[argc] = TYPE_IMM8;
-							imm[argc] = l->value;
-							argc += 1;
-						}
-						if (tok == LEX_IDENTIFIER)
-						{
-							RegisterKind curr = register_kind_from_sv(l->identifier);
-							if (curr == REG__Invaild) parse_error(&unit, "Wrong register: %.*s or something", SV_PRINT(l->identifier));
-							arg_type[argc] = register_types[curr];
-							reg[argc] = curr;
-							argc += 1;
-						}
-					}
-					InstructionKind specific_instr = instr_match_types(instr, argc, arg_type);
-					// TODO: better message for type mismatch
-					instr_assemble(&unit.code, specific_instr, arg_type, imm, reg);
-					break;
-				}
-			default:
-				{
-					parse_error(&unit, "Unexpected token |%s| at the beginning of a line", token_printable[tok]);
-				}
-		}
-	}
-	printf("1 passes, %lu bytes\n", unit.code.count);
-	printf("Compilation finished, %d errors, %d warnings\n", unit.err_count, unit.warn_count);
-	for (u64 i = 0;i < unit.code.count;++i)
-	{
-		printf("%02x ", unit.code.items[i] & 0xff);
-	}
-	printf("\n");
+                    Type arg_type[4] = {0};
+                    RegisterKind reg[4] = {0};
+                    i32 imm[4] = {0};
+                    int argc = 0;
+                    for (;argc < 4;)
+                    {
+                        tok = lexer_get(l);
+                        if (tok == LEX_COMMA) continue; // NOTE: now no commas are necessery for now
+                        if (tok == LEX_LINE_FEED) break;
+                        if (tok == LEX_EOF)
+                        {
+                            shouldKeepParsing = false;
+                            break;
+                        }
+                        if (tok == LEX_INT_LIT)
+                        {
+                            arg_type[argc] = TYPE_IMM8;
+                            imm[argc] = l->value;
+                            argc += 1;
+                        }
+                        if (tok == LEX_IDENTIFIER)
+                        {
+                            RegisterKind curr = register_kind_from_sv(l->identifier);
+                            if (curr == REG__Invaild) parse_error(&unit, "Wrong register: %.*s or something", SV_PRINT(l->identifier));
+                            arg_type[argc] = register_types[curr];
+                            reg[argc] = curr;
+                            argc += 1;
+                        }
+                    }
+                    InstructionKind specific_instr = instr_match_types(instr, argc, arg_type);
+                    // TODO: better message for type mismatch
+                    instr_assemble(&unit.code, specific_instr, arg_type, imm, reg);
+                    break;
+                }
+            default:
+                {
+                    parse_error(&unit, "Unexpected token |%s| at the beginning of a line", token_printable[tok]);
+                }
+        }
+    }
+    printf("1 passes, %lu bytes\n", unit.code.count);
+    printf("Compilation finished, %d errors, %d warnings\n", unit.err_count, unit.warn_count);
+    for (u64 i = 0;i < unit.code.count;++i)
+    {
+        printf("%02x ", unit.code.items[i] & 0xff);
+    }
+    printf("\n");
 
 
-	int (*executable_code)(const char*, unsigned long) = mmap(0, unit.code.count, PROT_EXEC | PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (executable_code == MAP_FAILED)
-	{
-		aasm_log(LOG_ERROR, "Could not map memory: %s\n", strerror(errno));
-	}
-	memcpy(executable_code, unit.code.items, unit.code.count);
-	int res = executable_code("Hello world!\n", 13);
-	printf("res = %d\n", res);
+    int (*executable_code)(const char*, unsigned long) = mmap(0, unit.code.count, PROT_EXEC | PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (executable_code == MAP_FAILED)
+    {
+        aasm_log(LOG_ERROR, "Could not map memory: %s\n", strerror(errno));
+    }
+    memcpy(executable_code, unit.code.items, unit.code.count);
+    int res = executable_code("Hello world!\n", 13);
+    printf("res = %d\n", res);
 
 
     return 0;
