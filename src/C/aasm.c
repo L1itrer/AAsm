@@ -64,13 +64,13 @@ typedef struct String
 
 typedef struct StringView
 {
-    char* pointer;
-    u64 length;
+    char* ptr;
+    u64 len;
 } StringView;
 
 typedef StringView SV;
 
-#define SV_PRINT(sv) (sv).length, (sv).pointer
+#define SV_PRINT(sv) (int)(sv).len, (sv).ptr
 
 bool string_read_file(const char* path, String* str);
 
@@ -237,20 +237,10 @@ i32 sv_to_i32(SV slice, Bases base)
 {
     i32 result = 0;
     i32 multiply_by = (i32)base;
-//    u64 i = slice.pointer[0] != '-' ? 3 : 2; // load up the first digit index
-//    if (c == 'b' || c == 'B' && slice.pointer[i-1] == '0') multiply_by = 2;
-//    else if (c == 'o' || c == 'O' && slice.pointer[i-1] == '0') multiply_by = 8;
-//    else if (c == 'x' || c == 'X' && slice.pointer[i-1] == '0') multiply_by = 16;
-//    else if (c == 'd' || c == 'D' && slice.pointer[i-1] == '0') multiply_by = 10;
-//    else
-//    {
-//        multiply_by = 10;
-//        i = slice.pointer[0] != '-' ? 1 : 0;
-//    }
 
-    for (u64 i = 0; i < slice.length;i += 1)
+    for (u64 i = 0; i < slice.len;i += 1)
     {
-        u8 c = slice.pointer[i];
+        u8 c = slice.ptr[i];
         if (c == '_') continue;
         if (!is_literal_character_valid(c, multiply_by))
         {
@@ -266,11 +256,11 @@ i32 sv_to_i32(SV slice, Bases base)
 i32 sv_cmp(SV str1, SV str2)
 {
 	// NOTE: some size considerations are necessery
-    if (str1.length != str2.length) return (i32)((i32)str1.length - (i32)str2.length);
-    for (u64 i = 0;i < str1.length;++i)
+    if (str1.len != str2.len) return (i32)((i32)str1.len - (i32)str2.len);
+    for (u64 i = 0;i < str1.len;++i)
     {
-        if (str1.pointer[i] != str2.pointer[i])
-            return str1.pointer[i] - str2.pointer[i];
+        if (str1.ptr[i] != str2.ptr[i])
+            return str1.ptr[i] - str2.ptr[i];
     }
     return 0;
 }
@@ -279,11 +269,11 @@ i32 sv_cmp(SV str1, SV str2)
 i32 sv_cmp_cstr(SV a, const char* b)
 {
 	size_t blen = strlen(b);
-	if (a.length != blen) return (i32)((i32)a.length - (i32)blen);
-	for (u64 i = 0;i < a.length;++i)
+	if (a.len != blen) return (i32)((i32)a.len - (i32)blen);
+	for (u64 i = 0;i < a.len;++i)
 	{
-		if (a.pointer[i] != b[i])
-			return a.pointer[i] - b[i];
+		if (a.ptr[i] != b[i])
+			return a.ptr[i] - b[i];
 	}
 	return 0;
 }
@@ -818,7 +808,7 @@ void token_print(Lexer* l, Token tok)
 	}
 	else if (tok == LEX_IDENTIFIER)
 	{
-		printf(", |%.*s|", (int)l->identifier.length, l->identifier.pointer);
+		printf(", |%.*s|", (int)l->identifier.len, l->identifier.ptr);
 	}
 	else if (tok == LEX_INT_LIT)
 	{
@@ -837,15 +827,15 @@ void lexer_init(Lexer *l, SV input_stream, String* storage)
 
 static char get_character(Lexer* l)
 {
-	char c = l->input_stream.pointer[l->byte_offset];
+	char c = l->input_stream.ptr[l->byte_offset];
 	l->byte_offset += 1;
 	return c;
 }
 
 static char peek_character(Lexer* l)
 {
-	if (l->byte_offset >= l->input_stream.length) return 0;
-	return l->input_stream.pointer[l->byte_offset+1];
+	if (l->byte_offset >= l->input_stream.len) return 0;
+	return l->input_stream.ptr[l->byte_offset];
 }
 
 static bool is_space(char c)
@@ -858,8 +848,8 @@ static bool is_space(char c)
 // 	do
 // 	{
 // 		l->byte_offset += 1;
-// 		c = l->input_stream.pointer[l->byte_offset];
-// 	} while (is_space(c) && l->byte_offset < l->input_stream.length);
+// 		c = l->input_stream.ptr[l->byte_offset];
+// 	} while (is_space(c) && l->byte_offset < l->input_stream.len);
 // 	l->byte_offset -= 1; // go back newline is a token
 // }
 
@@ -869,14 +859,14 @@ static void skip_until_newline(Lexer* l)
 	do
 	{
 		l->byte_offset += 1;
-		c = l->input_stream.pointer[l->byte_offset];
-	} while (c != '\n' && l->byte_offset < l->input_stream.length);
+		c = l->input_stream.ptr[l->byte_offset];
+	} while (c != '\n' && l->byte_offset < l->input_stream.len);
 }
 
 Token lexer_get(Lexer* l)
 {
-	// u64 flen = l->input_stream.length;
-	for (;l->byte_offset < l->input_stream.length;)
+	// u64 flen = l->input_stream.len;
+	for (;l->byte_offset < l->input_stream.len;)
 	{
 		u32 curr_offset = l->byte_offset;
 		char c = get_character(l);
@@ -912,36 +902,45 @@ Token lexer_get(Lexer* l)
 		{
 			c = peek_character(l);
 			if (c == 0) return LEX_EOF;
-			l->byte_offset += 1;
 			if (c == ',')
 			{
 				break;
 			}
 			if (is_space(c) || c == '\n') break;
+			get_character(l);
 		}
 		SV word = (SV){
-			.pointer = l->input_stream.pointer + curr_offset, 
-			.length = l->byte_offset - curr_offset,
+			.ptr = l->input_stream.ptr + curr_offset, 
+			.len = l->byte_offset - curr_offset,
 		};
 		l->identifier = word;
-		if (is_number(word.pointer[0]))
+		if (is_number(word.ptr[0]))
 		{
 			// TODO: introduce base from sv not from char
-			Bases base = bases_from_char(word.pointer[1]);
-			if (base == BASE_INVALID)
+			Bases base = BASE_INVALID;
+			//printf("word: %.*s, len %zu\n", SV_PRINT(word), word.len);
+			if (word.len > 1)
 			{
-				aasm_log(LOG_ERROR, "Invalid number base: %c at line %u", c, l->current_line);
-				return LEX_PARSE_ERROR;
+				base = bases_from_char(word.ptr[1]);
+				if (base == BASE_INVALID)
+				{
+					aasm_log(LOG_ERROR, "Invalid number base: %c at line %u", c, l->current_line);
+					return LEX_PARSE_ERROR;
+				}
+				// HACK: 
+				word.ptr += 2;
+				word.len -= 2;
 			}
-			// HACK: 
-			word.pointer += 2;
-			word.length -= 2;
+			else
+			{
+				base = BASE_DEC;
+			}
 			i32 num = sv_to_i32(word, base);
 			u32 unum = *(u32*)&num;
 			l->value = unum;
 			return LEX_INT_LIT;
 		}
-		else if (word.pointer[word.length-1] == ':')
+		else if (word.ptr[word.len-1] == ':')
 		{
 			// TODO: storing the labels
 			return LEX_LABELDEF;
@@ -982,8 +981,8 @@ bool tu_init(TranslationUnit* tu, const char* file_path, const char* output_path
 	tu->output_path = output_path;
 	if (!string_read_file(file_path, &tu->file_content)) return 1;
 	SV file_sv = (SV){
-		.pointer = tu->file_content.items, 
-		.length = tu->file_content.count
+		.ptr = tu->file_content.items, 
+		.len = tu->file_content.count
 	};
 
 	lexer_init(&tu->l, file_sv, &tu->str_storage);
@@ -1036,7 +1035,7 @@ int main(void)
 					InstructionKind instr = instr_get_from_sv(l->identifier);
 					if (instr == INSTR__Invalid)
 					{
-						parse_error(&unit, "Invalid identifier: |%.*s|", (int)l->identifier.length, l->identifier.pointer);
+						parse_error(&unit, "Invalid identifier: |%.*s|", (int)l->identifier.len, l->identifier.ptr);
 						break;
 					}
 					assert(instr_opcode[instr] == 0);
