@@ -1,3 +1,19 @@
+/* TODO:
+ * Lexer:
+ * - return specific registers instrucitons etc from the lexer rather than just IDENT
+ * - allow to get more than one token (opt)
+ * Memory:
+ * - arenas
+ * - hash tables (will be usefull for labels)
+ * - linked lists (opt)
+ * Labels:
+ * - record labels
+ * - jump instructions
+ * Field addressing:
+ * - yes
+ * Raw byte declarations:
+ * - yes
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,13 +31,8 @@
 #include <errno.h>
 #include <assert.h>
 
-
-const char msg[] = "Ready? Set! GO!\x0A";
 // ---------------------------------------------------------
 // -----------------------UTILITY---------------------------
-// ---------------------------------------------------------
-
-
 #ifndef stdout
 #define stdout 1
 #define stderr 2
@@ -30,13 +41,17 @@ const char msg[] = "Ready? Set! GO!\x0A";
 #define UNREACHABLE(msg) do { fprintf(stderr, "%s:%d UNREACHABLE: %s at", __FILE__, __LINE__, msg); abort(); } while(0)
 typedef unsigned char byte;
 typedef int8_t i8;
-typedef uint8_t u8;
 typedef int16_t i16;
-typedef uint16_t u16;
 typedef int32_t i32;
-typedef uint32_t u32;
 typedef int64_t i64;
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
 typedef uint64_t u64;
+
+#define local_persist static
+#define global static
 
 #define DA_INIT_CAP 1024*8
 
@@ -168,7 +183,7 @@ void aasm_log(AasmLogLevel level, const char* format, ...)
     switch(level)
     {
         case LOG_INFO:
-            fprintf(stdout, "[INFO]: ");
+            fprintf(stderr, "[INFO]: ");
             break;
         case LOG_WARNING:
             fprintf(stderr, "[WARNING]: ");
@@ -235,7 +250,7 @@ i32 sv_to_i32(SV slice, Bases base)
 
     for (u64 i = 0; i < slice.length;i += 1)
     {
-        u8 c = slice.pointer[i];\
+        u8 c = slice.pointer[i];
         if (c == '_') continue;
         if (!is_literal_character_valid(c, multiply_by))
         {
@@ -444,12 +459,9 @@ RegisterKind register_kind_from_sv(SV str)
 	return REG__Invaild;
 }
 
-
-
 // -------------------------------------------------------------------
 // ------------------------INSTRUCTIONS-------------------------------
 // -------------------------------------------------------------------
-
 
 #define INSTR_ARGS1(first) (first)
 #define INSTR_ARGS2(first, second) ((first) | (second << 8))
@@ -682,7 +694,7 @@ bool instr_assemble(String* code, InstructionKind instruction, Type given_args[4
 			goto type_rm32;
 		case TYPE_RM16:
 			bit16_prefix = true;
-			// fallthrough
+			[[fallthrough]];
 		case TYPE_RM8:
 		case TYPE_RM32:
 			type_rm32:
@@ -702,7 +714,7 @@ bool instr_assemble(String* code, InstructionKind instruction, Type given_args[4
 			goto type_r32;
 		case TYPE_R16:
 			bit16_prefix = true;
-			// fallthrough
+			[[fallthrough]];
 		case TYPE_R8:
 		case TYPE_R32:
 			type_r32:
@@ -1038,7 +1050,11 @@ int main(void)
 						tok = lexer_get(l);
 						if (tok == LEX_COMMA) continue; // NOTE: now no commas are necessery for now
 						if (tok == LEX_LINE_FEED) break;
-						if (tok == LEX_EOF) goto end;
+						if (tok == LEX_EOF)
+						{
+							shouldKeepParsing = false;
+							break;
+						}
 						if (tok == LEX_INT_LIT)
 						{
 							arg_type[argc] = TYPE_IMM8;
@@ -1065,7 +1081,6 @@ int main(void)
 				}
 		}
 	}
-end:
 	printf("1 passes, %lu bytes\n", unit.code.count);
 	printf("Compilation finished, %d errors, %d warnings\n", unit.err_count, unit.warn_count);
 	for (u64 i = 0;i < unit.code.count;++i)
